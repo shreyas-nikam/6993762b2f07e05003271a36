@@ -10,7 +10,8 @@ from xgboost import XGBClassifier
 from fairlearn.reductions import DemographicParity
 from sklearn.metrics import roc_auc_score, confusion_matrix
 
-st.set_page_config(page_title="QuLab: Lab 40: Fairness Testing of Credit Model", layout="wide")
+st.set_page_config(
+    page_title="QuLab: Lab 40: Fairness Testing of Credit Model", layout="wide")
 st.sidebar.image("https://www.quantuniversity.com/assets/img/logo5.jpg")
 st.sidebar.divider()
 st.title("QuLab: Lab 40: Fairness Testing of Credit Model")
@@ -35,13 +36,14 @@ if 'X_test_base' not in st.session_state:
 
 if 'X_test_fair' not in st.session_state:
     st.session_state.X_test_fair = None
-    st.session_state.X_train_fair = None 
+    st.session_state.X_train_fair = None
 
 if 'metrics_by_group' not in st.session_state:
     st.session_state.metrics_by_group = {}
     st.session_state.advantaged_groups = {}
     st.session_state.disadvantaged_groups = {}
-    st.session_state.protected_attributes = [('Gender', 'gender'), ('Race', 'race_group'), ('Age', 'age_group')]
+    st.session_state.protected_attributes = [
+        ('Gender', 'gender'), ('Race', 'race_group'), ('Age', 'age_group')]
 
 if 'proxy_results_by_group' not in st.session_state:
     st.session_state.proxy_results_by_group = {}
@@ -78,7 +80,8 @@ st.session_state.current_page = page_selection
 # Page: Introduction & Setup
 if st.session_state.current_page == 'Introduction & Setup':
     st.title("AI Credit Model Fairness Audit: A CFA Charterholder's Workflow")
-    st.header("Case Study: Detecting and Mitigating Bias in Credit Decisions at GlobalFin Bank")
+    st.header(
+        "Case Study: Detecting and Mitigating Bias in Credit Decisions at GlobalFin Bank")
     st.markdown(f"")
     st.markdown(f"As Ms. Anya Sharma, CFA, Head of Model Governance at GlobalFin Bank, you are tasked with ensuring that the bank's AI-powered credit scoring model operates not only efficiently but also ethically and in full compliance with evolving regulations. Recent scrutiny, particularly from the Equal Credit Opportunity Act (ECOA) in the US and the forthcoming EU AI Act, demands robust bias testing and documentation for high-risk AI systems like credit models.")
     st.markdown(f"")
@@ -91,11 +94,9 @@ if st.session_state.current_page == 'Introduction & Setup':
     st.markdown(f"")
 
     if st.button("Load Initial Model and Data"):
-        X_test_base, y_test, y_pred, y_pred_proba, y_pred_favorable, y_true_favorable, model, feature_cols, X_train_scaled, y_train_true, scaler = load_and_prepare_credit_data()
-        
-        # Ensure we use the original (unscaled) X_test for synthetic demographic generation
-        X_test_original = scaler.inverse_transform(X_test_base)
-        X_test_original = pd.DataFrame(X_test_original, columns=feature_cols)
+        X_test_base, y_test, y_pred, y_pred_proba, y_pred_favorable, y_true_favorable, model, feature_cols, X_train_scaled, y_train_true, scaler, X_test_original = load_and_prepare_credit_data()
+
+        # X_test_original is already returned from the function as an unscaled DataFrame
 
         # Store in session state
         st.session_state.X_test_base = X_test_base
@@ -113,11 +114,15 @@ if st.session_state.current_page == 'Introduction & Setup':
 
         st.success("Model and data loaded successfully!")
         st.markdown(f"**Initial Model Performance (on simulated test set):**")
-        st.write(f"ROC AUC: {roc_auc_score(st.session_state.y_test, st.session_state.y_pred_proba):.4f}")
-        tn, fp, fn, tp = confusion_matrix(st.session_state.y_test, st.session_state.y_pred).ravel()
+        st.write(
+            f"ROC AUC: {roc_auc_score(st.session_state.y_test, st.session_state.y_pred_proba):.4f}")
+        tn, fp, fn, tp = confusion_matrix(
+            st.session_state.y_test, st.session_state.y_pred).ravel()
         st.write(f"Accuracy: {(tp+tn)/(tn+fp+fn+tp):.4f}")
-        st.write(f"Predicted Approval Rate: {st.session_state.y_pred_favorable.mean():.2%}")
-        st.write(f"Actual Approval Rate: {st.session_state.y_true_favorable.mean():.2%}")
+        st.write(
+            f"Predicted Approval Rate: {st.session_state.y_pred_favorable.mean():.2%}")
+        st.write(
+            f"Actual Approval Rate: {st.session_state.y_true_favorable.mean():.2%}")
         st.markdown(f"")
         st.markdown(f"Ms. Sharma has successfully set up her environment and loaded the simulated credit dataset, which includes features like income, debt ratio, and credit score. A pre-trained `XGBClassifier` model, representing the bank's production credit scoring model, has also been loaded. The model's initial performance, including ROC AUC and predicted approval rates, provides a baseline for the fairness audit. Note that for fairness analysis, we define 'approval' as the favorable outcome, which is `y_pred_favorable` (1 if approved, 0 if denied). The original `y_pred` (1 for default, 0 for no default) is inverted for this purpose.")
         st.markdown(f"")
@@ -126,11 +131,15 @@ if st.session_state.current_page == 'Introduction & Setup':
     elif st.session_state.X_test_base is not None:
         st.success("Model and data already loaded.")
         st.markdown(f"**Initial Model Performance (on simulated test set):**")
-        st.write(f"ROC AUC: {roc_auc_score(st.session_state.y_test, st.session_state.y_pred_proba):.4f}")
-        tn, fp, fn, tp = confusion_matrix(st.session_state.y_test, st.session_state.y_pred).ravel()
+        st.write(
+            f"ROC AUC: {roc_auc_score(st.session_state.y_test, st.session_state.y_pred_proba):.4f}")
+        tn, fp, fn, tp = confusion_matrix(
+            st.session_state.y_test, st.session_state.y_pred).ravel()
         st.write(f"Accuracy: {(tp+tn)/(tn+fp+fn+tp):.4f}")
-        st.write(f"Predicted Approval Rate: {st.session_state.y_pred_favorable.mean():.2%}")
-        st.write(f"Actual Approval Rate: {st.session_state.y_true_favorable.mean():.2%}")
+        st.write(
+            f"Predicted Approval Rate: {st.session_state.y_pred_favorable.mean():.2%}")
+        st.write(
+            f"Actual Approval Rate: {st.session_state.y_true_favorable.mean():.2%}")
         st.markdown(f"")
         st.markdown(f"Ms. Sharma has successfully set up her environment and loaded the simulated credit dataset, which includes features like income, debt ratio, and credit score. A pre-trained `XGBClassifier` model, representing the bank's production credit scoring model, has also been loaded. The model's initial performance, including ROC AUC and predicted approval rates, provides a baseline for the fairness audit. Note that for fairness analysis, we define 'approval' as the favorable outcome, which is `y_pred_favorable` (1 if approved, 0 if denied). The original `y_pred` (1 for default, 0 for no default) is inverted for this purpose.")
         st.markdown(f"")
@@ -145,27 +154,37 @@ elif st.session_state.current_page == '2. Augment Data with Synthetic Demographi
     st.markdown(f"Ms. Sharma understands the sensitivity around demographic data. While production credit models at GlobalFin Bank intentionally exclude such attributes to avoid direct discrimination, regulatory bodies require robust evidence that no indirect discrimination occurs. To perform a comprehensive fairness audit, she needs to simulate how the model might behave across different demographic groups. For this lab, she will generate synthetic `gender`, `race_group`, and `age_group` attributes, carefully correlating them with existing financial features to mimic real-world proxy relationships (e.g., income with gender, revolving utilization with race, employment length with age).")
     st.markdown(f"")
     st.markdown(f"The mathematical basis for creating these correlations is rooted in simple logistic functions or direct correlations, designed to create discernible (but not perfectly deterministic) relationships for testing purposes. For example, `gender_prob` is linked to `income` using a sigmoid-like function:")
-    st.markdown(r"$$ \text{gender\_prob} = \frac{1}{1 + e^{-c \times \text{income\_norm}}} $$")
+    st.markdown(
+        r"""
+$$
+\text{gender\_prob} = \frac{1}{1 + e^{-c \times \text{income\_norm}}}
+$$""")
     st.markdown(r"where $\text{gender\_prob}$ is the probability of a specific gender, $c$ is a constant controlling the correlation strength, and $\text{income\_norm}$ is the normalized income. Similar logic applies to `race_prob` (correlated with `revolving_utilization`) and `age_group` (correlated with `employment_length`). This approach allows Ms. Sharma to test for 'disparate impact' even when protected attributes are not direct model inputs.")
     st.markdown(f"")
     st.warning("⚠️ Disclaimer: The synthetic demographics used here are for methodological demonstration only. In production fairness testing, firms use actual demographic data from sources like HMDA (Home Mortgage Disclosure Act) data or Bayesian Improved Surname Geocoding (BISG), where legally permissible. Using synthetic demographics for real regulatory compliance would be invalid.")
 
     if st.button("Augment Data with Synthetic Demographics"):
         if st.session_state.X_test_original is not None:
-            st.session_state.X_test_fair = augment_with_demographics(st.session_state.X_test_original.copy())
-            
+            st.session_state.X_test_fair = augment_with_demographics(
+                st.session_state.X_test_original.copy())
+
             # Also augment training data for consistency in later steps like tradeoff
-            X_train_original_unscaled = st.session_state.scaler.inverse_transform(st.session_state.X_train_scaled)
-            X_train_original_unscaled_df = pd.DataFrame(X_train_original_unscaled, columns=st.session_state.feature_cols)
-            st.session_state.X_train_fair = augment_with_demographics(X_train_original_unscaled_df.copy(), seed=43) # Use different seed for train
-            
+            X_train_original_unscaled = st.session_state.scaler.inverse_transform(
+                st.session_state.X_train_scaled)
+            X_train_original_unscaled_df = pd.DataFrame(
+                X_train_original_unscaled, columns=st.session_state.feature_cols)
+            st.session_state.X_train_fair = augment_with_demographics(
+                X_train_original_unscaled_df.copy(), seed=43)  # Use different seed for train
+
             st.success("Data augmented with synthetic demographics!")
-            st.markdown(f"Sample of augmented data with synthetic demographics:")
+            st.markdown(
+                f"Sample of augmented data with synthetic demographics:")
             st.dataframe(st.session_state.X_test_fair.head())
             st.markdown(f"")
             st.markdown(f"The `augment_with_demographics` function has successfully added synthetic `gender`, `race_group`, and `age_group` attributes to the credit dataset (`X_test_fair`). Ms. Sharma now has the necessary (synthetic) attributes to proceed with fairness testing, acknowledging that in a real audit, legally and ethically sourced demographic data (e.g., HMDA, BISG) would be used. This step is crucial for methodological demonstration, allowing her to detect potential biases that might otherwise remain hidden.")
         else:
-            st.error("Please load the initial model and data first on the 'Introduction & Setup' page.")
+            st.error(
+                "Please load the initial model and data first on the 'Introduction & Setup' page.")
     elif st.session_state.X_test_fair is not None:
         st.success("Data already augmented with synthetic demographics.")
         st.markdown(f"Sample of augmented data with synthetic demographics:")
@@ -175,29 +194,55 @@ elif st.session_state.current_page == '2. Augment Data with Synthetic Demographi
 
 # Page: 3. Quantify Group Fairness & Regulatory Compliance
 elif st.session_state.current_page == '3. Quantify Group Fairness & Regulatory Compliance':
-    st.header("3. Quantifying Group Fairness and Regulatory Compliance (Four-Fifths Rule)")
+    st.header(
+        "3. Quantifying Group Fairness and Regulatory Compliance (Four-Fifths Rule)")
     st.markdown(f"Ms. Sharma's core responsibility is to ensure the credit model complies with fair lending laws. This requires quantifying how the model's approval rates differ across various demographic groups and applying regulatory thresholds like the 'four-fifths rule' to identify disparate impact.")
     st.markdown(f"")
     st.markdown(f"As a CFA Charterholder, Ms. Sharma knows that 'fair lending is not optional—it is the law.' Disparate impact occurs when a neutral policy or model disproportionately affects a protected group, even without explicit discriminatory intent. The Equal Credit Opportunity Act (ECOA) prohibits such discrimination. The Equal Employment Opportunity Commission (EEOC) 'four-fifths rule' is a widely recognized regulatory threshold: if the selection rate for a protected group is less than 80% (or four-fifths) of the selection rate for the most favored group, it generally indicates disparate impact.")
     st.markdown(f"")
     st.markdown(f"Ms. Sharma needs to compute several key fairness metrics:")
     st.markdown(f"1. **Disparate Impact Ratio (DIR)**: Measures the ratio of the favorable outcome rate (e.g., approval rate) for the disadvantaged group to the favorable outcome rate for the advantaged group.")
-    st.markdown(r"$$ \text{DIR} = \frac{P(\hat{Y} = \text{approve} \mid G = \text{disadvantaged})}{P(\hat{Y} = \text{approve} \mid G = \text{advantaged})} $$")
-    st.markdown(r"where $P(\hat{Y} = \text{approve} \mid G)$ is the probability of approval given group $G$.")
-    st.markdown(f"The **Four-fifths rule** states that $\text{DIR} \ge 0.80$ is required for compliance. Below 0.80 constitutes prima facie evidence of disparate impact.")
+    st.markdown(
+        r"""
+$$
+\text{DIR} = \frac{P(\hat{Y} = \text{approve} \mid G = \text{disadvantaged})}{P(\hat{Y} = \text{approve} \mid G = \text{advantaged})}
+$$""")
+    st.markdown(
+        r"where $P(\hat{Y} = \text{approve} \mid G)$ is the probability of approval given group $G$.")
+    st.markdown(
+        r"The **Four-fifths rule** states that $\text{DIR} \ge 0.80$ is required for compliance. Below 0.80 constitutes prima facie evidence of disparate impact.")
     st.markdown(f"2. **Statistical Parity Difference (SPD)**: The absolute difference in favorable outcome rates between groups. Ideally, this should be close to zero.")
-    st.markdown(r"$$ \text{SPD} = |P(\hat{Y} = 1 \mid G = A) - P(\hat{Y} = 1 \mid G = B)| $$")
-    st.markdown(r"Where $\hat{Y} = 1$ is the favorable outcome (approval), and $G=A$ and $G=B$ represent two different demographic groups.")
+    st.markdown(
+        r"""
+$$
+\text{SPD} = |P(\hat{Y} = 1 \mid G = A) - P(\hat{Y} = 1 \mid G = B)|
+$$""")
+    st.markdown(
+        r"Where $\hat{Y} = 1$ is the favorable outcome (approval), and $G=A$ and $G=B$ represent two different demographic groups.")
     st.markdown(f"3. **Equal Opportunity Difference (EOD)**: Measures the absolute difference in False Negative Rates (FNR) between groups. A high FNR for a disadvantaged group means truly creditworthy applicants are unfairly denied.")
-    st.markdown(r"$$ \text{EOD} = |\text{FNR}_A - \text{FNR}_B| $$")
-    st.markdown(r"where $\text{FNR}_A$ and $\text{FNR}_B$ are the False Negative Rates for groups A and B respectively.")
+    st.markdown(r"""
+$$
+\text{EOD} = |\text{FNR}_A - \text{FNR}_B|
+$$""")
+    st.markdown(
+        r"where $\text{FNR}_A$ and $\text{FNR}_B$ are the False Negative Rates for groups A and B respectively.")
     st.markdown(f"4. **False Positive Rate (FPR) Parity**: Measures the absolute difference in False Positive Rates between groups. A high FPR for a disadvantaged group means truly uncreditworthy applicants are unfairly approved (less common concern in credit, but relevant for other domains).")
-    st.markdown(r"$$ \text{FPR Parity} = |\text{FPR}_A - \text{FPR}_B| $$")
-    st.markdown(r"where $\text{FPR}_A$ and $\text{FPR}_B$ are the False Positive Rates for groups A and B respectively.")
+    st.markdown(r"""
+$$
+\text{FPR Parity} = |\text{FPR}_A - \text{FPR}_B|
+$$""")
+    st.markdown(
+        r"where $\text{FPR}_A$ and $\text{FPR}_B$ are the False Positive Rates for groups A and B respectively.")
     st.markdown(f"5. **Predictive Parity**: Measures the absolute difference in Positive Predictive Values (PPV) between groups. If PPV differs, it means that among those predicted as creditworthy, the actual default rates differ across groups.")
-    st.markdown(r"$$ \text{Predictive Parity} = |\text{PPV}_A - \text{PPV}_B| $$")
-    st.markdown(r"where $\text{PPV}_A$ and $\text{PPV}_B$ are the Positive Predictive Values for groups A and B respectively.")
-    st.markdown(f"These metrics allow Ms. Sharma to quantitatively assess the model's fairness across different dimensions.")
+    st.markdown(
+        r"""
+$$
+\text{Predictive Parity} = |\text{PPV}_A - \text{PPV}_B|
+$$""")
+    st.markdown(
+        r"where $\text{PPV}_A$ and $\text{PPV}_B$ are the Positive Predictive Values for groups A and B respectively.")
+    st.markdown(
+        f"These metrics allow Ms. Sharma to quantitatively assess the model's fairness across different dimensions.")
 
     if st.session_state.X_test_fair is not None:
         if st.button("Compute Fairness Metrics for All Protected Attributes"):
@@ -209,7 +254,8 @@ elif st.session_state.current_page == '3. Quantify Group Fairness & Regulatory C
                 st.session_state.metrics_by_group[attr_name] = entry
                 st.session_state.advantaged_groups[attr_name] = adv_g
                 st.session_state.disadvantaged_groups[attr_name] = dis_g
-            st.success("Fairness metrics computed for all protected attributes!")
+            st.success(
+                "Fairness metrics computed for all protected attributes!")
             st.markdown(f"")
             st.markdown(f"Ms. Sharma has executed the `compute_fairness_metrics` function across all three synthetic protected attributes (`gender`, `race_group`, and `age_group`). The output details the approval rates, False Negative Rates (FNR), False Positive Rates (FPR), and other key metrics for each group. Crucially, the Disparate Impact Ratio (DIR) is calculated, and its compliance with the 'four-fifths rule' is immediately assessed (PASS/FAIL).")
             st.markdown(f"")
@@ -226,11 +272,13 @@ elif st.session_state.current_page == '3. Quantify Group Fairness & Regulatory C
                     'Predictive Parity Difference': data['predictive_parity_diff'],
                     'Fairlearn Equalized Odds Difference': data['equalized_odds_diff_fairlearn']
                 })
-            st.dataframe(pd.DataFrame(metrics_table_data).set_index('Protected Attribute'))
+            st.dataframe(pd.DataFrame(metrics_table_data).set_index(
+                'Protected Attribute'))
 
             st.markdown(f"")
             st.markdown(f"**Approval Rate Bar Chart:**")
-            fig, axes = plt.subplots(1, len(st.session_state.protected_attributes), figsize=(18, 6), sharey=True)
+            fig, axes = plt.subplots(
+                1, len(st.session_state.protected_attributes), figsize=(18, 6), sharey=True)
             if len(st.session_state.protected_attributes) == 1:
                 axes = [axes]
 
@@ -240,15 +288,18 @@ elif st.session_state.current_page == '3. Quantify Group Fairness & Regulatory C
                 groups = list(details.keys())
                 approval_rates = [details[g]['approval_rate'] for g in groups]
 
-                sns.barplot(x=groups, y=approval_rates, ax=ax, palette='viridis')
+                sns.barplot(x=groups, y=approval_rates,
+                            ax=ax, palette='viridis')
                 ax.set_title(f'Approval Rate by {attr_name}')
                 ax.set_ylabel('Approval Rate')
                 ax.set_ylim(0, max(approval_rates) * 1.2)
 
                 # Add Four-fifths rule line
-                advantaged_rate = details[st.session_state.metrics_by_group[attr_name]['advantaged_group']]['approval_rate']
+                advantaged_rate = details[st.session_state.metrics_by_group[attr_name]
+                                          ['advantaged_group']]['approval_rate']
                 four_fifths_threshold = advantaged_rate * 0.80
-                ax.axhline(four_fifths_threshold, color='red', linestyle='--', label='4/5ths Rule Threshold')
+                ax.axhline(four_fifths_threshold, color='red',
+                           linestyle='--', label='4/5ths Rule Threshold')
                 ax.legend()
                 ax.text(0.5, 0.95, f"DIR: {st.session_state.metrics_by_group[attr_name]['disparate_impact_ratio']:.3f}",
                         horizontalalignment='center', verticalalignment='top', transform=ax.transAxes,
@@ -276,11 +327,13 @@ elif st.session_state.current_page == '3. Quantify Group Fairness & Regulatory C
                     'Predictive Parity Difference': data['predictive_parity_diff'],
                     'Fairlearn Equalized Odds Difference': data['equalized_odds_diff_fairlearn']
                 })
-            st.dataframe(pd.DataFrame(metrics_table_data).set_index('Protected Attribute'))
+            st.dataframe(pd.DataFrame(metrics_table_data).set_index(
+                'Protected Attribute'))
 
             st.markdown(f"")
             st.markdown(f"**Approval Rate Bar Chart:**")
-            fig, axes = plt.subplots(1, len(st.session_state.protected_attributes), figsize=(18, 6), sharey=True)
+            fig, axes = plt.subplots(
+                1, len(st.session_state.protected_attributes), figsize=(18, 6), sharey=True)
             if len(st.session_state.protected_attributes) == 1:
                 axes = [axes]
 
@@ -290,14 +343,17 @@ elif st.session_state.current_page == '3. Quantify Group Fairness & Regulatory C
                 groups = list(details.keys())
                 approval_rates = [details[g]['approval_rate'] for g in groups]
 
-                sns.barplot(x=groups, y=approval_rates, ax=ax, palette='viridis')
+                sns.barplot(x=groups, y=approval_rates,
+                            ax=ax, palette='viridis')
                 ax.set_title(f'Approval Rate by {attr_name}')
                 ax.set_ylabel('Approval Rate')
                 ax.set_ylim(0, max(approval_rates) * 1.2)
 
-                advantaged_rate = details[st.session_state.metrics_by_group[attr_name]['advantaged_group']]['approval_rate']
+                advantaged_rate = details[st.session_state.metrics_by_group[attr_name]
+                                          ['advantaged_group']]['approval_rate']
                 four_fifths_threshold = advantaged_rate * 0.80
-                ax.axhline(four_fifths_threshold, color='red', linestyle='--', label='4/5ths Rule Threshold')
+                ax.axhline(four_fifths_threshold, color='red',
+                           linestyle='--', label='4/5ths Rule Threshold')
                 ax.legend()
                 ax.text(0.5, 0.95, f"DIR: {st.session_state.metrics_by_group[attr_name]['disparate_impact_ratio']:.3f}",
                         horizontalalignment='center', verticalalignment='top', transform=ax.transAxes,
@@ -316,12 +372,18 @@ elif st.session_state.current_page == '4. Identify Potential Proxy Variables':
     st.markdown(f"")
     st.markdown(f"The challenge of proxy variables is one of the hardest problems in fair lending. A feature like 'revolving_utilization' (how much of available credit is being used) is a legitimate business factor for creditworthiness. However, if 'revolving_utilization' is also highly correlated with a protected attribute (e.g., 'race_group' due to historical lending patterns or access to financial services in certain neighborhoods), and if the model relies heavily on this feature, it can become a proxy, perpetuating historical biases.")
     st.markdown(f"")
-    st.markdown(f"Ms. Sharma must identify features that exhibit a 'dual condition':")
-    st.markdown(f"1. **Significant Correlation**: The feature is statistically correlated with a protected attribute.")
+    st.markdown(
+        f"Ms. Sharma must identify features that exhibit a 'dual condition':")
+    st.markdown(
+        f"1. **Significant Correlation**: The feature is statistically correlated with a protected attribute.")
     st.markdown(f"2. **High Model Importance**: The feature has a high impact on the model's predictions (e.g., measured by SHAP values).")
     st.markdown(f"")
     st.markdown(f"The **Proxy Risk Score** quantifies this dual condition:")
-    st.markdown(r"$$ \text{Proxy Risk Score} = |\text{Correlation with Protected Attribute}| \times \frac{\text{SHAP Importance}}{\text{Max SHAP Importance}} $$")
+    st.markdown(
+        r"""
+$$
+\text{Proxy Risk Score} = |\text{Correlation with Protected Attribute}| \times \frac{\text{SHAP Importance}}{\text{Max SHAP Importance}}
+$$""")
     st.markdown(r"where SHAP Importance is the mean absolute SHAP value for a feature. A high proxy risk score indicates a feature that warrants close scrutiny and potential business justification or mitigation. The decision to keep or remove a proxy variable is a policy judgment requiring legal, compliance, and business input, not purely a technical one.")
 
     if st.session_state.X_test_fair is not None and st.session_state.model is not None:
@@ -334,23 +396,29 @@ elif st.session_state.current_page == '4. Identify Potential Proxy Variables':
             "Correlation Threshold to Flag as High-Risk",
             min_value=0.01, max_value=0.5, value=0.15, step=0.01
         )
-        
+
         if st.button(f"Detect Proxy Variables for {selected_attr_proxy}"):
-            col_name = next(col for name, col in st.session_state.protected_attributes if name == selected_attr_proxy)
+            col_name = next(
+                col for name, col in st.session_state.protected_attributes if name == selected_attr_proxy)
             current_proxy_df = detect_proxy_variables(
-                st.session_state.model, st.session_state.X_test_base, st.session_state.X_test_fair[col_name],
-                st.session_state.feature_cols, threshold=threshold
+                st.session_state.model, st.session_state.X_test_base, st.session_state.X_test_fair[
+                    col_name],
+                st.session_state.feature_cols, st.session_state.scaler, threshold=threshold
             )
             st.session_state.proxy_results_by_group[selected_attr_proxy] = current_proxy_df
             st.success(f"Proxy variables detected for {selected_attr_proxy}!")
             st.markdown(f"")
-            st.markdown(f"Ms. Sharma has successfully run the `detect_proxy_variables` function for {selected_attr_proxy}, leveraging SHAP values to quantify model importance and statistical correlation to protected attributes. The tabular output highlights features with high proxy risk scores, indicating strong correlation with a protected attribute and significant model importance.")
+            st.markdown(
+                f"Ms. Sharma has successfully run the `detect_proxy_variables` function for {selected_attr_proxy}, leveraging SHAP values to quantify model importance and statistical correlation to protected attributes. The tabular output highlights features with high proxy risk scores, indicating strong correlation with a protected attribute and significant model importance.")
             st.markdown(f"")
-            st.markdown(f"**Proxy Variable Detection Results for {selected_attr_proxy}:**")
-            st.dataframe(current_proxy_df.sort_values('proxy_risk_score', ascending=False).head(10))
+            st.markdown(
+                f"**Proxy Variable Detection Results for {selected_attr_proxy}:**")
+            st.dataframe(current_proxy_df.sort_values(
+                'proxy_risk_score', ascending=False).head(10))
 
             st.markdown(f"")
-            st.markdown(f"**Proxy Risk Scatter Plot for {selected_attr_proxy}:**")
+            st.markdown(
+                f"**Proxy Risk Scatter Plot for {selected_attr_proxy}:**")
             # Use matplotlib plot function directly
             fig, ax = plt.subplots(figsize=(10, 7))
             df = current_proxy_df
@@ -360,7 +428,7 @@ elif st.session_state.current_page == '4. Identify Potential Proxy Variables':
                 y='shap_importance',
                 hue='is_proxy',
                 size='proxy_risk_score',
-                sizes=(50, 500), # Size range of markers
+                sizes=(50, 500),  # Size range of markers
                 palette={True: 'red', False: 'blue'},
                 alpha=0.7,
                 ax=ax
@@ -368,9 +436,12 @@ elif st.session_state.current_page == '4. Identify Potential Proxy Variables':
             ax.set_title(f'Proxy Risk for {selected_attr_proxy}')
             ax.set_xlabel('Correlation with Protected Attribute (Absolute)')
             ax.set_ylabel('Model SHAP Importance (Mean Absolute)')
-            ax.axhline(df['shap_importance'].median(), color='gray', linestyle=':', label='Median SHAP Importance')
-            ax.axvline(threshold, color='orange', linestyle=':', label=f'Correlation Threshold ({threshold:.2f})')
-            ax.legend(title='Is Proxy?', bbox_to_anchor=(1.05, 1), loc='upper left')
+            ax.axhline(df['shap_importance'].median(), color='gray',
+                       linestyle=':', label='Median SHAP Importance')
+            ax.axvline(threshold, color='orange', linestyle=':',
+                       label=f'Correlation Threshold ({threshold:.2f})')
+            ax.legend(title='Is Proxy?', bbox_to_anchor=(
+                1.05, 1), loc='upper left')
             ax.grid(True, linestyle='--', alpha=0.6)
             plt.tight_layout()
             st.pyplot(fig)
@@ -379,16 +450,21 @@ elif st.session_state.current_page == '4. Identify Potential Proxy Variables':
             st.markdown(f"")
             st.markdown(f"This analysis allows Ms. Sharma to identify features that, while seemingly neutral (e.g., `revolving_utilization`, `employment_length`), might be indirectly driving biased outcomes. This is critical for model governance, as these features require documented business justification or consideration for mitigation strategies to ensure compliance and ethical AI deployment.")
         elif selected_attr_proxy in st.session_state.proxy_results_by_group:
-            st.success(f"Proxy variables already detected for {selected_attr_proxy}.")
+            st.success(
+                f"Proxy variables already detected for {selected_attr_proxy}.")
             current_proxy_df = st.session_state.proxy_results_by_group[selected_attr_proxy]
             st.markdown(f"")
-            st.markdown(f"Ms. Sharma has successfully run the `detect_proxy_variables` function for {selected_attr_proxy}, leveraging SHAP values to quantify model importance and statistical correlation to protected attributes. The tabular output highlights features with high proxy risk scores, indicating strong correlation with a protected attribute and significant model importance.")
+            st.markdown(
+                f"Ms. Sharma has successfully run the `detect_proxy_variables` function for {selected_attr_proxy}, leveraging SHAP values to quantify model importance and statistical correlation to protected attributes. The tabular output highlights features with high proxy risk scores, indicating strong correlation with a protected attribute and significant model importance.")
             st.markdown(f"")
-            st.markdown(f"**Proxy Variable Detection Results for {selected_attr_proxy}:**")
-            st.dataframe(current_proxy_df.sort_values('proxy_risk_score', ascending=False).head(10))
+            st.markdown(
+                f"**Proxy Variable Detection Results for {selected_attr_proxy}:**")
+            st.dataframe(current_proxy_df.sort_values(
+                'proxy_risk_score', ascending=False).head(10))
 
             st.markdown(f"")
-            st.markdown(f"**Proxy Risk Scatter Plot for {selected_attr_proxy}:**")
+            st.markdown(
+                f"**Proxy Risk Scatter Plot for {selected_attr_proxy}:**")
             fig, ax = plt.subplots(figsize=(10, 7))
             df = current_proxy_df
             sns.scatterplot(
@@ -405,9 +481,12 @@ elif st.session_state.current_page == '4. Identify Potential Proxy Variables':
             ax.set_title(f'Proxy Risk for {selected_attr_proxy}')
             ax.set_xlabel('Correlation with Protected Attribute (Absolute)')
             ax.set_ylabel('Model SHAP Importance (Mean Absolute)')
-            ax.axhline(df['shap_importance'].median(), color='gray', linestyle=':', label='Median SHAP Importance')
-            ax.axvline(threshold, color='orange', linestyle=':', label=f'Correlation Threshold ({threshold:.2f})')
-            ax.legend(title='Is Proxy?', bbox_to_anchor=(1.05, 1), loc='upper left')
+            ax.axhline(df['shap_importance'].median(), color='gray',
+                       linestyle=':', label='Median SHAP Importance')
+            ax.axvline(threshold, color='orange', linestyle=':',
+                       label=f'Correlation Threshold ({threshold:.2f})')
+            ax.legend(title='Is Proxy?', bbox_to_anchor=(
+                1.05, 1), loc='upper left')
             ax.grid(True, linestyle='--', alpha=0.6)
             plt.tight_layout()
             st.pyplot(fig)
@@ -416,7 +495,8 @@ elif st.session_state.current_page == '4. Identify Potential Proxy Variables':
             st.markdown(f"")
             st.markdown(f"This analysis allows Ms. Sharma to identify features that, while seemingly neutral (e.g., `revolving_utilization`, `employment_length`), might be indirectly driving biased outcomes. This is critical for model governance, as these features require documented business justification or consideration for mitigation strategies to ensure compliance and ethical AI deployment.")
     else:
-        st.error("Please ensure initial model and augmented data are loaded on previous pages.")
+        st.error(
+            "Please ensure initial model and augmented data are loaded on previous pages.")
 
 # Page: 5. Conduct Counterfactual Fairness Tests
 elif st.session_state.current_page == '5. Conduct Counterfactual Fairness Tests':
@@ -438,42 +518,60 @@ elif st.session_state.current_page == '5. Conduct Counterfactual Fairness Tests'
             [attr_name for attr_name, _ in st.session_state.protected_attributes],
             key='cf_attr_select'
         )
-        
+
         if st.button(f"Run Counterfactual Test for {selected_attr_cf}"):
-            col_name = next(col for name, col in st.session_state.protected_attributes if name == selected_attr_cf)
-            
-            current_proxy_df = st.session_state.proxy_results_by_group.get(selected_attr_cf, pd.DataFrame())
-            top_proxies = current_proxy_df[current_proxy_df['is_proxy']]['feature'].tolist()
+            col_name = next(
+                col for name, col in st.session_state.protected_attributes if name == selected_attr_cf)
+
+            current_proxy_df = st.session_state.proxy_results_by_group.get(
+                selected_attr_cf, pd.DataFrame())
+            top_proxies = current_proxy_df[current_proxy_df['is_proxy']]['feature'].tolist(
+            )
 
             delta, flipped = counterfactual_test(
-                st.session_state.model, st.session_state.X_test_original, st.session_state.y_pred_proba,
-                st.session_state.X_test_fair[col_name], st.session_state.feature_cols,
-                proxy_features=top_proxies
+                model=st.session_state.model,
+                X_test_original=st.session_state.X_test_original,
+                X_test_scaled=st.session_state.X_test_base,
+                y_pred_proba_original=st.session_state.y_pred_proba,
+                protected_col_series=st.session_state.X_test_fair[col_name],
+                protected_col_name=col_name,
+                feature_cols=st.session_state.feature_cols,
+                proxy_features=top_proxies,
+                scaler_obj=st.session_state.scaler,
+                X_train_scaled=st.session_state.X_train_scaled,
+                X_train_fair=st.session_state.X_train_fair
             )
-            
-            if not isinstance(delta, float): # Check if the test was actually run (not skipped)
-                st.session_state.counterfactual_results[selected_attr_cf] = {'delta_mean': delta.mean(), 'flipped_rate': flipped.mean()}
+
+            # Check if the test was actually run (not skipped)
+            if not isinstance(delta, float):
+                st.session_state.counterfactual_results[selected_attr_cf] = {
+                    'delta_mean': delta.mean(), 'flipped_rate': flipped.mean()}
                 st.session_state.counterfactual_deltas[selected_attr_cf] = delta
-                st.success(f"Counterfactual test completed for {selected_attr_cf}!")
+                st.success(
+                    f"Counterfactual test completed for {selected_attr_cf}!")
 
                 st.markdown(f"")
                 st.markdown(f"Ms. Sharma has performed counterfactual fairness tests for {selected_attr_cf}, taking into account previously identified proxy features. The output provides key metrics: the mean and max prediction changes, and most importantly, the percentage of predictions that 'flipped' (i.e., changed from approval to denial or vice versa). A high flip rate indicates that the model's decisions are unacceptably sensitive to protected attributes, even after accounting for related proxy feature adjustments.")
                 st.markdown(f"")
-                st.markdown(f"**Counterfactual Test Results for {selected_attr_cf}:**")
+                st.markdown(
+                    f"**Counterfactual Test Results for {selected_attr_cf}:**")
                 if top_proxies:
-                    st.write(f"Proxy features adjusted: {', '.join(top_proxies[:3])}")
+                    st.write(
+                        f"Proxy features adjusted: {', '.join(top_proxies[:3])}")
                 else:
                     st.write("No proxy features adjusted.")
                 st.write(f"Mean prediction change: {delta.mean():.4f}")
                 st.write(f"Max prediction change: {delta.max():.4f}")
                 st.write(f"Predictions flipped: {flipped.mean():.2%}")
-                
+
                 st.markdown(f"")
-                st.markdown(f"**Counterfactual Delta Histogram for {selected_attr_cf}:**")
+                st.markdown(
+                    f"**Counterfactual Delta Histogram for {selected_attr_cf}:**")
                 # Use matplotlib plot function directly
                 fig, ax = plt.subplots(figsize=(10, 6))
                 sns.histplot(delta, bins=30, kde=True, ax=ax)
-                ax.set_title(f'Counterfactual Prediction Change for {selected_attr_cf}')
+                ax.set_title(
+                    f'Counterfactual Prediction Change for {selected_attr_cf}')
                 ax.set_xlabel('Absolute Change in Prediction Probability')
                 ax.set_ylabel('Frequency')
                 plt.tight_layout()
@@ -481,31 +579,39 @@ elif st.session_state.current_page == '5. Conduct Counterfactual Fairness Tests'
                 st.markdown(f"")
                 st.markdown(f"The histograms visualize the distribution of these prediction changes, allowing Ms. Sharma to see the magnitude and frequency of the model's sensitivity. If a significant number of applicants would receive a different decision solely based on their demographic group (and associated proxy shifts), it flags a serious individual fairness concern that GlobalFin Bank must address to ensure equitable treatment for all applicants.")
             else:
-                st.warning(f"Counterfactual test skipped for {selected_attr_cf} as it is not a binary protected attribute or other conditions not met.")
+                st.warning(
+                    f"Counterfactual test skipped for {selected_attr_cf} as it is not a binary protected attribute or other conditions not met.")
 
         elif selected_attr_cf in st.session_state.counterfactual_results:
-            st.success(f"Counterfactual test already completed for {selected_attr_cf}.")
+            st.success(
+                f"Counterfactual test already completed for {selected_attr_cf}.")
             res = st.session_state.counterfactual_results[selected_attr_cf]
             delta = st.session_state.counterfactual_deltas[selected_attr_cf]
 
             st.markdown(f"")
             st.markdown(f"Ms. Sharma has performed counterfactual fairness tests for {selected_attr_cf}, taking into account previously identified proxy features. The output provides key metrics: the mean and max prediction changes, and most importantly, the percentage of predictions that 'flipped' (i.e., changed from approval to denial or vice versa). A high flip rate indicates that the model's decisions are unacceptably sensitive to protected attributes, even after accounting for related proxy feature adjustments.")
             st.markdown(f"")
-            st.markdown(f"**Counterfactual Test Results for {selected_attr_cf}:**")
-            current_proxy_df = st.session_state.proxy_results_by_group.get(selected_attr_cf, pd.DataFrame())
-            top_proxies = current_proxy_df[current_proxy_df['is_proxy']]['feature'].tolist()
+            st.markdown(
+                f"**Counterfactual Test Results for {selected_attr_cf}:**")
+            current_proxy_df = st.session_state.proxy_results_by_group.get(
+                selected_attr_cf, pd.DataFrame())
+            top_proxies = current_proxy_df[current_proxy_df['is_proxy']]['feature'].tolist(
+            )
             if top_proxies:
-                st.write(f"Proxy features adjusted: {', '.join(top_proxies[:3])}")
+                st.write(
+                    f"Proxy features adjusted: {', '.join(top_proxies[:3])}")
             else:
                 st.write("No proxy features adjusted.")
             st.write(f"Mean prediction change: {res['delta_mean']:.4f}")
             st.write(f"Predictions flipped: {res['flipped_rate']:.2%}")
-            
+
             st.markdown(f"")
-            st.markdown(f"**Counterfactual Delta Histogram for {selected_attr_cf}:**")
+            st.markdown(
+                f"**Counterfactual Delta Histogram for {selected_attr_cf}:**")
             fig, ax = plt.subplots(figsize=(10, 6))
             sns.histplot(delta, bins=30, kde=True, ax=ax)
-            ax.set_title(f'Counterfactual Prediction Change for {selected_attr_cf}')
+            ax.set_title(
+                f'Counterfactual Prediction Change for {selected_attr_cf}')
             ax.set_xlabel('Absolute Change in Prediction Probability')
             ax.set_ylabel('Frequency')
             plt.tight_layout()
@@ -517,7 +623,8 @@ elif st.session_state.current_page == '5. Conduct Counterfactual Fairness Tests'
 
 # Page: 6. Analyze Accuracy-Fairness Trade-off
 elif st.session_state.current_page == '6. Analyze Accuracy-Fairness Trade-off':
-    st.header("6. Analyzing the Accuracy-Fairness Trade-off and Impossibility Theorem")
+    st.header(
+        "6. Analyzing the Accuracy-Fairness Trade-off and Impossibility Theorem")
     st.markdown(f"Ms. Sharma now faces a critical decision point: how much model accuracy is GlobalFin Bank willing to 'sacrifice' to achieve greater fairness? She needs to quantify this trade-off and understand the deeper implications of the 'impossibility theorem' in fair machine learning.")
     st.markdown(f"")
     st.markdown(f"For GlobalFin Bank, maximizing model accuracy (e.g., higher AUC for predicting default) is a business imperative. However, strict adherence to fairness metrics might necessitate a slight reduction in overall accuracy. Ms. Sharma's role is to quantify this `accuracy-fairness trade-off` and communicate its economic and reputational implications to senior management and compliance.")
@@ -525,7 +632,8 @@ elif st.session_state.current_page == '6. Analyze Accuracy-Fairness Trade-off':
     st.markdown(f"She also needs to articulate the **Impossibility Theorem** (Chouldechova, 2017), which states that when base rates (actual default rates) differ across groups, it's generally mathematically impossible to satisfy all fairness metrics (e.g., statistical parity, equal opportunity, and predictive parity) simultaneously. This means GlobalFin Bank must make a policy decision about which fairness criterion to prioritize, guided by legal counsel and ethical considerations.")
     st.markdown(f"")
     st.markdown(f"To assess the trade-off, Ms. Sharma will compare:")
-    st.markdown(f"1. **Unconstrained Model**: The original model, optimized solely for accuracy (e.g., AUC).")
+    st.markdown(
+        f"1. **Unconstrained Model**: The original model, optimized solely for accuracy (e.g., AUC).")
     st.markdown(f"2. **Fairness-Constrained Model**: A model retrained or adjusted to explicitly satisfy a fairness constraint (e.g., Demographic Parity). She will use `fairlearn.reductions.ExponentiatedGradient` for this, a powerful algorithm to find fair models.")
     st.markdown(f"")
     st.markdown(f"The goal is to quantify the 'cost of fairness' in terms of reduced AUC, and weigh it against the far greater financial and reputational costs of a fair lending violation (fines, lawsuits, reputational damage). Often, a 1-3% drop in AUC is an acceptable cost for achieving regulatory compliance and ethical standards.")
@@ -533,54 +641,70 @@ elif st.session_state.current_page == '6. Analyze Accuracy-Fairness Trade-off':
     if st.session_state.X_train_scaled is not None and st.session_state.y_train_true is not None and st.session_state.X_test_base is not None and st.session_state.y_test is not None and st.session_state.X_train_fair is not None and st.session_state.X_test_fair is not None:
         selected_attr_tradeoff = st.selectbox(
             "Select Protected Attribute for Trade-off Analysis",
-            [attr_name for attr_name, _ in st.session_state.protected_attributes if attr_name == 'Race'], # Often shows most significant disparity
+            # Often shows most significant disparity
+            [attr_name for attr_name,
+                _ in st.session_state.protected_attributes if attr_name == 'Race'],
             key='tradeoff_attr_select'
         )
-        
+
         if st.button(f"Analyze Accuracy-Fairness Trade-off for {selected_attr_tradeoff}"):
-            col_name = next(col for name, col in st.session_state.protected_attributes if name == selected_attr_tradeoff)
-            
+            col_name = next(
+                col for name, col in st.session_state.protected_attributes if name == selected_attr_tradeoff)
+
             # Ensure y_train_favorable and y_test_favorable_tradeoff are correctly derived
             y_train_favorable = 1 - st.session_state.y_train_true
             y_test_favorable_tradeoff = 1 - st.session_state.y_test
 
-            base_auc, fair_auc, base_dir, fair_dir = accuracy_fairness_tradeoff(
+            tradeoff_results = accuracy_fairness_tradeoff(
                 st.session_state.X_train_scaled, y_train_favorable, st.session_state.X_test_base, y_test_favorable_tradeoff,
-                st.session_state.X_train_fair[col_name], st.session_state.X_test_fair[col_name]
+                st.session_state.X_train_fair[col_name], st.session_state.X_test_fair[col_name],
+                use_cache=True
             )
             st.session_state.tradeoff_results = {
-                'base_auc': base_auc,
-                'fair_auc': fair_auc,
-                'base_dir': base_dir,
-                'fair_dir': fair_dir,
-                'cost_of_fairness': base_auc - fair_auc
+                'base_auc': tradeoff_results['base_auc'],
+                # Note: uses fair_acc from the function
+                'fair_auc': tradeoff_results['fair_acc'],
+                'base_dir': tradeoff_results['base_dir'],
+                'fair_dir': tradeoff_results['fair_dir'],
+                'cost_of_fairness': tradeoff_results['base_auc'] - tradeoff_results['fair_acc']
             }
-            st.success(f"Accuracy-Fairness Trade-off analysis completed for {selected_attr_tradeoff}!")
+            st.success(
+                f"Accuracy-Fairness Trade-off analysis completed for {selected_attr_tradeoff}!")
 
             st.markdown(f"")
             st.markdown(f"Ms. Sharma has performed a critical analysis of the accuracy-fairness trade-off using `fairlearn.reductions.ExponentiatedGradient`. The results clearly show the baseline performance of the unconstrained model (in terms of AUC and DIR) versus the fairness-constrained model. She can observe how much AUC might decrease to satisfy the four-fifths rule for Disparate Impact Ratio.")
             st.markdown(f"")
             st.markdown(f"**Accuracy-Fairness Trade-off Results:**")
-            st.write(f"{'Metric':<30s} {'Unconstrained':>15s} {'Fair Model':>15s}")
+            st.write(
+                f"{'Metric':<30s} {'Unconstrained':>15s} {'Fair Model':>15s}")
             st.write("-" * 55)
-            st.write(f"{'AUC':<30s} {base_auc:>15.4f} {fair_auc:>15.4f}")
-            st.write(f"{'Disparate Impact Ratio':<30s} {base_dir:>15.3f} {fair_dir:>15.3f}")
-            st.write(f"{'Four-Fifths Rule':<30s} {'PASS' if base_dir >= 0.80 else 'FAIL':>15s} {'PASS' if fair_dir >= 0.80 else 'FAIL':>15s}")
-            st.write(f"{'AUC Cost of Fairness':<30s} {'---':>15s} {base_auc - fair_auc:>+15.4f}")
+            st.write(
+                f"{'AUC':<30s} {st.session_state.tradeoff_results['base_auc']:>15.4f} {st.session_state.tradeoff_results['fair_auc']:>15.4f}")
+            st.write(
+                f"{'Disparate Impact Ratio':<30s} {st.session_state.tradeoff_results['base_dir']:>15.3f} {st.session_state.tradeoff_results['fair_dir']:>15.3f}")
+            st.write(
+                f"{'Four-Fifths Rule':<30s} {'PASS' if st.session_state.tradeoff_results['base_dir'] >= 0.80 else 'FAIL':>15s} {'PASS' if st.session_state.tradeoff_results['fair_dir'] >= 0.80 else 'FAIL':>15s}")
+            st.write(
+                f"{'AUC Cost of Fairness':<30s} {'---':>15s} {st.session_state.tradeoff_results['cost_of_fairness']:>+15.4f}")
 
             st.markdown(f"")
             st.markdown(f"**Accuracy-Fairness Pareto Curve:**")
             # Use matplotlib plot function directly
             fig, ax = plt.subplots(figsize=(8, 6))
-            plt.scatter(st.session_state.tradeoff_results['base_dir'], st.session_state.tradeoff_results['base_auc'], color='blue', s=200, label='Unconstrained Model')
-            plt.scatter(st.session_state.tradeoff_results['fair_dir'], st.session_state.tradeoff_results['fair_auc'], color='red', s=200, label='Fairness-Constrained Model')
+            plt.scatter(st.session_state.tradeoff_results['base_dir'],
+                        st.session_state.tradeoff_results['base_auc'], color='blue', s=200, label='Unconstrained Model')
+            plt.scatter(st.session_state.tradeoff_results['fair_dir'], st.session_state.tradeoff_results[
+                        'fair_auc'], color='red', s=200, label='Fairness-Constrained Model')
             plt.plot([st.session_state.tradeoff_results['base_dir'], st.session_state.tradeoff_results['fair_dir']],
-                     [st.session_state.tradeoff_results['base_auc'], st.session_state.tradeoff_results['fair_auc']],
+                     [st.session_state.tradeoff_results['base_auc'],
+                         st.session_state.tradeoff_results['fair_auc']],
                      color='gray', linestyle='--', alpha=0.7, label='Trade-off Path')
 
-            plt.axvline(0.80, color='green', linestyle=':', label='4/5ths Rule Threshold (0.80 DIR)')
+            plt.axvline(0.80, color='green', linestyle=':',
+                        label='4/5ths Rule Threshold (0.80 DIR)')
 
-            plt.title('Accuracy-Fairness Trade-off (AUC vs. Disparate Impact Ratio)')
+            plt.title(
+                'Accuracy-Fairness Trade-off (AUC vs. Disparate Impact Ratio)')
             plt.xlabel('Disparate Impact Ratio (DIR)')
             plt.ylabel('ROC AUC')
             plt.xlim(0, 1.05)
@@ -592,28 +716,39 @@ elif st.session_state.current_page == '6. Analyze Accuracy-Fairness Trade-off':
             st.markdown(f"The output provides the concrete numbers needed to present to stakeholders. For example, a 0.02 drop in AUC might be a small price to pay to transform a 'FAIL' on the four-fifths rule into a 'PASS.' The conceptual Pareto curve visually reinforces this trade-off. This quantitative understanding, coupled with the 'impossibility theorem,' empowers Ms. Sharma to lead informed policy discussions at GlobalFin Bank, ensuring that the bank makes deliberate, ethically sound, and legally compliant choices regarding its AI models.")
 
         elif st.session_state.tradeoff_results:
-            st.success(f"Accuracy-Fairness Trade-off analysis already completed for {selected_attr_tradeoff}.")
+            st.success(
+                f"Accuracy-Fairness Trade-off analysis already completed for {selected_attr_tradeoff}.")
             st.markdown(f"")
             st.markdown(f"Ms. Sharma has performed a critical analysis of the accuracy-fairness trade-off using `fairlearn.reductions.ExponentiatedGradient`. The results clearly show the baseline performance of the unconstrained model (in terms of AUC and DIR) versus the fairness-constrained model. She can observe how much AUC might decrease to satisfy the four-fifths rule for Disparate Impact Ratio.")
             st.markdown(f"")
             st.markdown(f"**Accuracy-Fairness Trade-off Results:**")
-            st.write(f"{'Metric':<30s} {'Unconstrained':>15s} {'Fair Model':>15s}")
+            st.write(
+                f"{'Metric':<30s} {'Unconstrained':>15s} {'Fair Model':>15s}")
             st.write("-" * 55)
-            st.write(f"{'AUC':<30s} {st.session_state.tradeoff_results['base_auc'] :>15.4f} {st.session_state.tradeoff_results['fair_auc'] :>15.4f}")
-            st.write(f"{'Disparate Impact Ratio':<30s} {st.session_state.tradeoff_results['base_dir'] :>15.3f} {st.session_state.tradeoff_results['fair_dir'] :>15.3f}")
-            st.write(f"{'Four-Fifths Rule':<30s} {'PASS' if st.session_state.tradeoff_results['base_dir'] >= 0.80 else 'FAIL':>15s} {'PASS' if st.session_state.tradeoff_results['fair_dir'] >= 0.80 else 'FAIL':>15s}")
-            st.write(f"{'AUC Cost of Fairness':<30s} {'--':>15s} {st.session_state.tradeoff_results['cost_of_fairness'] :>+15.4f}")
+            st.write(
+                f"{'AUC':<30s} {st.session_state.tradeoff_results['base_auc']:>15.4f} {st.session_state.tradeoff_results['fair_auc']:>15.4f}")
+            st.write(
+                f"{'Disparate Impact Ratio':<30s} {st.session_state.tradeoff_results['base_dir']:>15.3f} {st.session_state.tradeoff_results['fair_dir']:>15.3f}")
+            st.write(
+                f"{'Four-Fifths Rule':<30s} {'PASS' if st.session_state.tradeoff_results['base_dir'] >= 0.80 else 'FAIL':>15s} {'PASS' if st.session_state.tradeoff_results['fair_dir'] >= 0.80 else 'FAIL':>15s}")
+            st.write(
+                f"{'AUC Cost of Fairness':<30s} {'--':>15s} {st.session_state.tradeoff_results['cost_of_fairness']:>+15.4f}")
 
             st.markdown(f"")
             st.markdown(f"**Accuracy-Fairness Pareto Curve:**")
             fig, ax = plt.subplots(figsize=(8, 6))
-            plt.scatter(st.session_state.tradeoff_results['base_dir'], st.session_state.tradeoff_results['base_auc'], color='blue', s=200, label='Unconstrained Model')
-            plt.scatter(st.session_state.tradeoff_results['fair_dir'], st.session_state.tradeoff_results['fair_auc'], color='red', s=200, label='Fairness-Constrained Model')
+            plt.scatter(st.session_state.tradeoff_results['base_dir'],
+                        st.session_state.tradeoff_results['base_auc'], color='blue', s=200, label='Unconstrained Model')
+            plt.scatter(st.session_state.tradeoff_results['fair_dir'], st.session_state.tradeoff_results[
+                        'fair_auc'], color='red', s=200, label='Fairness-Constrained Model')
             plt.plot([st.session_state.tradeoff_results['base_dir'], st.session_state.tradeoff_results['fair_dir']],
-                     [st.session_state.tradeoff_results['base_auc'], st.session_state.tradeoff_results['fair_auc']],
+                     [st.session_state.tradeoff_results['base_auc'],
+                         st.session_state.tradeoff_results['fair_auc']],
                      color='gray', linestyle='--', alpha=0.7, label='Trade-off Path')
-            plt.axvline(0.80, color='green', linestyle=':', label='4/5ths Rule Threshold (0.80 DIR)')
-            plt.title('Accuracy-Fairness Trade-off (AUC vs. Disparate Impact Ratio)')
+            plt.axvline(0.80, color='green', linestyle=':',
+                        label='4/5ths Rule Threshold (0.80 DIR)')
+            plt.title(
+                'Accuracy-Fairness Trade-off (AUC vs. Disparate Impact Ratio)')
             plt.xlabel('Disparate Impact Ratio (DIR)')
             plt.ylabel('ROC AUC')
             plt.xlim(0, 1.05)
@@ -634,11 +769,16 @@ elif st.session_state.current_page == '7. Compile Regulatory-Ready Fairness Audi
     st.markdown(f"The final step for Ms. Sharma as Head of Model Governance is to synthesize all findings into a clear, actionable report. This 'AI Credit Model Fairness Audit Report' is a critical deliverable for GlobalFin Bank, demonstrating due diligence and providing a roadmap for addressing identified biases. It is designed to be easily digestible by non-technical stakeholders while containing sufficient detail for regulatory review (e.g., under ECOA or EU AI Act provisions for high-risk AI).")
     st.markdown(f"")
     st.markdown(f"The report will summarize:")
-    st.markdown(f"- **Group Fairness Metrics**: Compliance status with the four-fifths rule for each protected attribute.")
-    st.markdown(f"- **Proxy Variables**: Identification of features acting as proxies, along with their risk scores.")
-    st.markdown(f"- **Counterfactual Fairness**: Assessment of individual-level discrimination.")
-    st.markdown(f"- **Accuracy-Fairness Trade-off**: Quantitative assessment of the performance impact of fairness constraints.")
-    st.markdown(f"- **Overall Assessment**: A concise conclusion (PASS, CONDITIONAL, FAIL) for the model's fairness.")
+    st.markdown(
+        f"- **Group Fairness Metrics**: Compliance status with the four-fifths rule for each protected attribute.")
+    st.markdown(
+        f"- **Proxy Variables**: Identification of features acting as proxies, along with their risk scores.")
+    st.markdown(
+        f"- **Counterfactual Fairness**: Assessment of individual-level discrimination.")
+    st.markdown(
+        f"- **Accuracy-Fairness Trade-off**: Quantitative assessment of the performance impact of fairness constraints.")
+    st.markdown(
+        f"- **Overall Assessment**: A concise conclusion (PASS, CONDITIONAL, FAIL) for the model's fairness.")
     st.markdown(f"- **Recommended Actions**: Specific steps for GlobalFin Bank to take, such as investigating proxies, considering fairness-constrained retraining, or conducting adverse action analysis.")
     st.markdown(f"")
     st.markdown(f"This report transforms complex technical analysis into strategic insights, enabling GlobalFin Bank to mitigate legal, financial, and reputational risks associated with algorithmic bias.")
@@ -652,73 +792,114 @@ elif st.session_state.current_page == '7. Compile Regulatory-Ready Fairness Audi
                 st.session_state.tradeoff_results
             )
             st.success("Fairness Audit Report Generated!")
-            
+
             # Display the report as formatted markdown
             report = st.session_state.final_audit_report
-            st.markdown(f"\n" + "=" * 60)
-            st.markdown(f"**FAIRNESS AUDIT REPORT: {report['title']}**")
-            st.markdown("=" * 60)
-            st.markdown(f"**Model:** {report['model']}")
-            st.markdown(f"**Date:** {pd.Timestamp(report['date']).strftime('%Y-%m-%d %H:%M:%S')}")
-            st.markdown(f"**Regulatory Framework:** {', '.join(report['regulatory_framework'])}")
-            st.markdown(f"\n**OVERALL ASSESSMENT:**")
-            st.markdown(f"  -> {report['overall_assessment']}")
+            with st.container(border=True):
+                st.markdown(f"\n" + "=" * 60)
+                st.markdown(f"**FAIRNESS AUDIT REPORT: {report['title']}**")
+                st.markdown("=" * 60)
+                st.markdown(f"**Model:** {report['model']}")
+                st.markdown(
+                    f"**Date:** {pd.Timestamp(report['date']).strftime('%Y-%m-%d %H:%M:%S')}")
+                st.markdown(
+                    f"**Regulatory Framework:** {', '.join(report['regulatory_framework'])}")
+                st.markdown(f"\n**OVERALL ASSESSMENT:**")
+                st.markdown(f"  -> {report['overall_assessment']}")
 
-            st.markdown(f"\n**FINDINGS:**")
-            for finding in report['findings']:
-                st.markdown(f"\n**[{finding['severity']}] {finding['attribute']}:**")
-                st.markdown(f"  {finding['finding']}")
-                if 'action' in finding and finding['action'] != 'None required':
-                    st.markdown(f"  Action: {finding['action']}")
+                st.markdown(f"\n**FINDINGS:**")
+                for finding in report['findings']:
+                    st.markdown(
+                        f"\n**[{finding['severity']}] {finding['attribute']}:**")
+                    st.markdown(f"  {finding['finding']}")
+                    if 'action' in finding and finding['action'] != 'None required':
+                        st.markdown(f"  Action: {finding['action']}")
 
-            if report['required_actions']:
-                st.markdown(f"\n**REQUIRED ACTIONS:**")
-                for action in report['required_actions']:
-                    st.markdown(f"  - {action}")
+                if report['required_actions']:
+                    st.markdown(f"\n**REQUIRED ACTIONS:**")
+                    for action in report['required_actions']:
+                        st.markdown(f"  - {action}")
 
-            st.markdown(f"\n**Sign-off:**")
-            st.markdown(f" Fair Lending Officer: __________________________ Date: ________")
-            st.markdown(f" Compliance Director:  __________________________ Date: ________")
-            st.markdown(f" Head of Model Governance (Anya Sharma, CFA): ____ Date: ________")
-            
-            st.markdown(f"")
-            st.markdown(f"Ms. Sharma has successfully compiled the comprehensive 'AI Credit Model Fairness Audit Report.' The output presents a structured overview, beginning with a clear overall assessment (PASS, CONDITIONAL, or FAIL) based on the severity of identified biases. Each finding, from disparate impact to proxy variables and counterfactual sensitivity, is detailed with its severity and specific recommended actions.")
-            st.markdown(f"")
-            st.markdown(f"This report serves as GlobalFin Bank's official record, providing transparent documentation for internal stakeholders and external regulators. For Ms. Sharma, this report is not just a summary of technical results but a strategic document that drives policy decisions, risk mitigation, and ensures GlobalFin Bank's AI systems adhere to the highest ethical and legal standards in fair lending.")
-        
+                st.markdown(f"\n**Sign-off:**")
+                st.markdown(
+                    f" Fair Lending Officer: __________________________ Date: ________")
+                st.markdown(
+                    f" Compliance Director:  __________________________ Date: ________")
+                st.markdown(
+                    f" Head of Model Governance (Anya Sharma, CFA): ____ Date: ________")
+
+                st.markdown(f"")
+                st.markdown(f"Ms. Sharma has successfully compiled the comprehensive 'AI Credit Model Fairness Audit Report.' The output presents a structured overview, beginning with a clear overall assessment (PASS, CONDITIONAL, or FAIL) based on the severity of identified biases. Each finding, from disparate impact to proxy variables and counterfactual sensitivity, is detailed with its severity and specific recommended actions.")
+                st.markdown(f"")
+                st.markdown(f"This report serves as GlobalFin Bank's official record, providing transparent documentation for internal stakeholders and external regulators. For Ms. Sharma, this report is not just a summary of technical results but a strategic document that drives policy decisions, risk mitigation, and ensures GlobalFin Bank's AI systems adhere to the highest ethical and legal standards in fair lending.")
+
         elif st.session_state.final_audit_report is not None:
             st.success("Fairness Audit Report already generated.")
             report = st.session_state.final_audit_report
-            st.markdown(f"\n" + "=" * 60)
-            st.markdown(f"**FAIRNESS AUDIT REPORT: {report['title']}**")
-            st.markdown("=" * 60)
-            st.markdown(f"**Model:** {report['model']}")
-            st.markdown(f"**Date:** {pd.Timestamp(report['date']).strftime('%Y-%m-%d %H:%M:%S')}")
-            st.markdown(f"**Regulatory Framework:** {', '.join(report['regulatory_framework'])}")
-            st.markdown(f"\n**OVERALL ASSESSMENT:**")
-            st.markdown(f"  -> {report['overall_assessment']}")
+            with st.container(border=True):
+                st.markdown(f"\n" + "=" * 60)
+                st.markdown(f"**FAIRNESS AUDIT REPORT: {report['title']}**")
+                st.markdown("=" * 60)
+                st.markdown(f"**Model:** {report['model']}")
+                st.markdown(
+                    f"**Date:** {pd.Timestamp(report['date']).strftime('%Y-%m-%d %H:%M:%S')}")
+                st.markdown(
+                    f"**Regulatory Framework:** {', '.join(report['regulatory_framework'])}")
+                st.markdown(f"\n**OVERALL ASSESSMENT:**")
+                st.markdown(f"  -> {report['overall_assessment']}")
 
-            st.markdown(f"\n**FINDINGS:**")
+                st.markdown(f"\n**FINDINGS:**")
+                for finding in report['findings']:
+                    st.markdown(
+                        f"\n**[{finding['severity']}] {finding['attribute']}:**")
+                    st.markdown(f"  {finding['finding']}")
+                    if 'action' in finding and finding['action'] != 'None required':
+                        st.markdown(f"  Action: {finding['action']}")
+
+                if report['required_actions']:
+                    st.markdown(f"\n**REQUIRED ACTIONS:**")
+                    for action in report['required_actions']:
+                        st.markdown(f"  - {action}")
+
+                st.markdown(f"\n**Sign-off:**")
+                st.markdown(
+                    f" Fair Lending Officer: __________________________ Date: ________")
+                st.markdown(
+                    f" Compliance Director:  __________________________ Date: ________")
+                st.markdown(
+                    f" Head of Model Governance (Anya Sharma, CFA): ____ Date: ________")
+
+                st.markdown(f"")
+                st.markdown(f"Ms. Sharma has successfully compiled the comprehensive 'AI Credit Model Fairness Audit Report.' The output presents a structured overview, beginning with a clear overall assessment (PASS, CONDITIONAL, or FAIL) based on the severity of identified biases. Each finding, from disparate impact to proxy variables and counterfactual sensitivity, is detailed with its severity and specific recommended actions.")
+                st.markdown(f"")
+                st.markdown(f"This report serves as GlobalFin Bank's official record, providing transparent documentation for internal stakeholders and external regulators. For Ms. Sharma, this report is not just a summary of technical results but a strategic document that drives policy decisions, risk mitigation, and ensures GlobalFin Bank's AI systems adhere to the highest ethical and legal standards in fair lending.")
+        if st.session_state.final_audit_report:
+            report_str = f"FAIRNESS AUDIT REPORT: {report['title']}\n"
+            report_str += "=" * 60 + "\n"
+            report_str += f"Model: {report['model']}\n"
+            report_str += f"Date: {pd.Timestamp(report['date'])}\n"
+            report_str += f"Regulatory Framework: {', '.join(report['regulatory_framework'])}\n\n"
+            report_str += f"OVERALL ASSESSMENT:\n  -> {report['overall_assessment']}\n\n"
+            report_str += f"FINDINGS:\n"
             for finding in report['findings']:
-                st.markdown(f"\n**[{finding['severity']}] {finding['attribute']}:**")
-                st.markdown(f"  {finding['finding']}")
+                report_str += f"\n[{finding['severity']}] {finding['attribute']}:\n  {finding['finding']}\n"
                 if 'action' in finding and finding['action'] != 'None required':
-                    st.markdown(f"  Action: {finding['action']}")
-
+                    report_str += f"  Action: {finding['action']}\n"
             if report['required_actions']:
-                st.markdown(f"\n**REQUIRED ACTIONS:**")
+                report_str += f"\nREQUIRED ACTIONS:\n"
                 for action in report['required_actions']:
-                    st.markdown(f"  - {action}")
-
-            st.markdown(f"\n**Sign-off:**")
-            st.markdown(f" Fair Lending Officer: __________________________ Date: ________")
-            st.markdown(f" Compliance Director:  __________________________ Date: ________")
-            st.markdown(f" Head of Model Governance (Anya Sharma, CFA): ____ Date: ________")
-
-            st.markdown(f"")
-            st.markdown(f"Ms. Sharma has successfully compiled the comprehensive 'AI Credit Model Fairness Audit Report.' The output presents a structured overview, beginning with a clear overall assessment (PASS, CONDITIONAL, or FAIL) based on the severity of identified biases. Each finding, from disparate impact to proxy variables and counterfactual sensitivity, is detailed with its severity and specific recommended actions.")
-            st.markdown(f"")
-            st.markdown(f"This report serves as GlobalFin Bank's official record, providing transparent documentation for internal stakeholders and external regulators. For Ms. Sharma, this report is not just a summary of technical results but a strategic document that drives policy decisions, risk mitigation, and ensures GlobalFin Bank's AI systems adhere to the highest ethical and legal standards in fair lending.")
+                    report_str += f"  - {action}\n"
+            report_str += f"\nSign-off:\n"
+            report_str += f" Fair Lending Officer: __________________________ Date: ________\n"
+            report_str += f" Compliance Director:  __________________________ Date: ________\n"
+            report_str += f" Head of Model Governance (Anya Sharma, CFA): ____ Date: ________\n"
+            # Create a download link
+            st.download_button(
+                label="Download Fairness Audit Report",
+                data=report_str,
+                file_name=f"Fairness_Audit_Report_{report['date']}.txt",
+                mime="text/plain"
+            )
 
     else:
         st.error("Please ensure all previous analysis steps (Fairness Metrics, Proxy Variables, Counterfactual Tests, Trade-off Analysis) are completed to generate the final report.")

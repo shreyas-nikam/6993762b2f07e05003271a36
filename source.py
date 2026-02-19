@@ -7,15 +7,21 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score, confusion_matrix, accuracy_score
 from xgboost import XGBClassifier
 import shap
-from fairlearn.metrics import (demographic_parity_difference, equalized_odds_difference, MetricFrame)
+from fairlearn.metrics import (
+    demographic_parity_difference, equalized_odds_difference, MetricFrame)
 from fairlearn.reductions import ExponentiatedGradient, DemographicParity
-from scipy.stats import pointbiserialr, pearsonr # For proxy detection
+from scipy.stats import pointbiserialr, pearsonr  # For proxy detection
+import hashlib
+import pickle
+import os
 
 # Set random seed for reproducibility
 np.random.seed(42)
 pd.set_option('display.max_columns', None)
 
 # Helper function for Disparate Impact Ratio
+
+
 def _compute_dir_ratio(y_pred_favorable, sensitive):
     """
     Disparate Impact Ratio (DIR) = min_group_selection_rate / max_group_selection_rate.
@@ -26,7 +32,8 @@ def _compute_dir_ratio(y_pred_favorable, sensitive):
     s = pd.Series(sensitive).reset_index(drop=True)
 
     if len(y) != len(s):
-        raise ValueError(f"Length mismatch: y_pred ({len(y)}) vs sensitive ({len(s)})")
+        raise ValueError(
+            f"Length mismatch: y_pred ({len(y)}) vs sensitive ({len(s)})")
 
     groups = pd.unique(s.dropna())
     if len(groups) < 2:
@@ -78,7 +85,8 @@ def load_and_prepare_credit_data(n_samples=10000, test_size=0.3, random_state=42
     X_base = pd.DataFrame(data)
 
     scaler = StandardScaler()
-    X_scaled = pd.DataFrame(scaler.fit_transform(X_base), columns=X_base.columns)
+    X_scaled = pd.DataFrame(scaler.fit_transform(
+        X_base), columns=X_base.columns)
 
     default_prob = (
         (X_scaled['debt_ratio'] * 0.4) +
@@ -87,21 +95,25 @@ def load_and_prepare_credit_data(n_samples=10000, test_size=0.3, random_state=42
         (X_scaled['income'] * -0.1) +
         np.random.normal(0, 0.5, n_samples)
     )
-    y_true = (default_prob > default_prob.median()).astype(int) # 1=default, 0=no default
+    y_true = (default_prob > default_prob.median()).astype(
+        int)  # 1=default, 0=no default
 
     X_train_scaled, X_test_scaled, y_train_true, y_test_true = train_test_split(
         X_scaled, y_true, test_size=test_size, random_state=random_state, stratify=y_true
     )
 
-    model = XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=random_state)
+    model = XGBClassifier(use_label_encoder=False,
+                          eval_metric='logloss', random_state=random_state)
     model.fit(X_train_scaled, y_train_true)
 
     y_pred_proba = model.predict_proba(X_test_scaled)[:, 1]
-    y_pred = (y_pred_proba > 0.5).astype(int) # 1=predicted default, 0=predicted no default
+    # 1=predicted default, 0=predicted no default
+    y_pred = (y_pred_proba > 0.5).astype(int)
 
     # For fairness metrics, 1 typically represents the 'favorable' outcome (e.g., approval)
-    y_pred_favorable = 1 - y_pred # 1 if approved, 0 if denied/default predicted
-    y_true_favorable = 1 - y_test_true # 1 if actually approved, 0 if actually defaulted
+    y_pred_favorable = 1 - y_pred  # 1 if approved, 0 if denied/default predicted
+    # 1 if actually approved, 0 if actually defaulted
+    y_true_favorable = 1 - y_test_true
 
     print("Initial Model Performance (on simulated test set):")
     print(f"ROC AUC: {roc_auc_score(y_test_true, y_pred_proba):.4f}")
@@ -113,7 +125,8 @@ def load_and_prepare_credit_data(n_samples=10000, test_size=0.3, random_state=42
     feature_cols = X_scaled.columns.tolist()
 
     # Create X_test_original here for consistency (unscaled version of X_test_scaled)
-    X_test_original = pd.DataFrame(scaler.inverse_transform(X_test_scaled), columns=feature_cols)
+    X_test_original = pd.DataFrame(
+        scaler.inverse_transform(X_test_scaled), columns=feature_cols)
 
     return (X_test_scaled, y_test_true, y_pred, y_pred_proba, y_pred_favorable, y_true_favorable,
             model, feature_cols, X_train_scaled, y_train_true, scaler, X_test_original)
@@ -130,23 +143,31 @@ def augment_with_demographics(X: pd.DataFrame, seed=42) -> pd.DataFrame:
     X_copy = X.copy()
 
     # Gender: weakly correlated with income
-    income_norm = (X_copy['income'] - X_copy['income'].mean()) / X_copy['income'].std()
+    income_norm = (X_copy['income'] -
+                   X_copy['income'].mean()) / X_copy['income'].std()
     gender_prob = 1 / (1 + np.exp(-0.3 * income_norm))
-    X_copy['gender'] = np.random.binomial(1, gender_prob) # 1=Male, 0=Female
+    X_copy['gender'] = np.random.binomial(1, gender_prob)  # 1=Male, 0=Female
 
     # Race/ethnicity: correlated with revolving_utilization as proxy
-    util_norm = (X_copy['revolving_utilization'] - X_copy['revolving_utilization'].mean()) / X_copy['revolving_utilization'].std()
+    util_norm = (X_copy['revolving_utilization'] -
+                 X_copy['revolving_utilization'].mean()) / X_copy['revolving_utilization'].std()
     race_prob = 1 / (1 + np.exp(0.4 * util_norm))
-    X_copy['race_group'] = np.where(np.random.random(n) < race_prob, 'Group_A', 'Group_B')
+    X_copy['race_group'] = np.where(
+        np.random.random(n) < race_prob, 'Group_A', 'Group_B')
 
     # Age: correlated with employment length
-    employment_length_series = X_copy.get('employment_length', pd.Series(np.random.uniform(0, 30, n), index=X_copy.index))
-    X_copy['age_group'] = np.where(employment_length_series > 10, 'Over_40', 'Under_40')
+    employment_length_series = X_copy.get('employment_length', pd.Series(
+        np.random.uniform(0, 30, n), index=X_copy.index))
+    X_copy['age_group'] = np.where(
+        employment_length_series > 10, 'Over_40', 'Under_40')
 
     print("Demographic augmentation details:")
-    print(f" Gender: {(X_copy['gender']==1).mean():.0%} Male, {(X_copy['gender']==0).mean():.0%} Female")
-    print(f" Race: {(X_copy['race_group']=='Group_A').mean():.0%} Group A, {(X_copy['race_group']=='Group_B').mean():.0%} Group B")
-    print(f" Age: {(X_copy['age_group']=='Over_40').mean():.0%} Over 40, {(X_copy['age_group']=='Under_40').mean():.0%} Under 40")
+    print(
+        f" Gender: {(X_copy['gender'] == 1).mean():.0%} Male, {(X_copy['gender'] == 0).mean():.0%} Female")
+    print(
+        f" Race: {(X_copy['race_group'] == 'Group_A').mean():.0%} Group A, {(X_copy['race_group'] == 'Group_B').mean():.0%} Group B")
+    print(
+        f" Age: {(X_copy['age_group'] == 'Over_40').mean():.0%} Over 40, {(X_copy['age_group'] == 'Under_40').mean():.0%} Under 40")
 
     return X_copy
 
@@ -163,9 +184,12 @@ def compute_fairness_metrics(y_true_favorable, y_pred_favorable, y_prob_favorabl
     Returns:
         tuple: (fairness_report_entry, group_results, advantaged_group, disadvantaged_group)
     """
-    y_true_aligned = pd.Series(y_true_favorable).reset_index(drop=True).astype(int)
-    y_pred_aligned = pd.Series(y_pred_favorable).reset_index(drop=True).astype(int)
-    y_prob_aligned = pd.Series(y_prob_favorable).reset_index(drop=True).astype(float)
+    y_true_aligned = pd.Series(
+        y_true_favorable).reset_index(drop=True).astype(int)
+    y_pred_aligned = pd.Series(
+        y_pred_favorable).reset_index(drop=True).astype(int)
+    y_prob_aligned = pd.Series(y_prob_favorable).reset_index(
+        drop=True).astype(float)
     s_aligned = pd.Series(sensitive_feature).reset_index(drop=True)
 
     valid = s_aligned.notna()
@@ -190,10 +214,10 @@ def compute_fairness_metrics(y_true_favorable, y_pred_favorable, y_prob_favorabl
             labels=[0, 1]
         ).ravel()
 
-        denom_true_pos = tp + fn # Actual favorable cases
-        denom_true_neg = tn + fp # Actual unfavorable cases
-        denom_pred_pos = tp + fp # Predicted favorable cases
-        denom_pred_neg = tn + fn # Predicted unfavorable cases
+        denom_true_pos = tp + fn  # Actual favorable cases
+        denom_true_neg = tn + fp  # Actual unfavorable cases
+        denom_pred_pos = tp + fp  # Predicted favorable cases
+        denom_pred_neg = tn + fn  # Predicted unfavorable cases
 
         group_fnr = fn / denom_true_pos if denom_true_pos > 0 else np.nan
         group_fpr = fp / denom_true_neg if denom_true_neg > 0 else np.nan
@@ -202,7 +226,8 @@ def compute_fairness_metrics(y_true_favorable, y_pred_favorable, y_prob_favorabl
 
         y_true_g = y_true_aligned[mask]
         y_prob_g = y_prob_aligned[mask]
-        auc_g = roc_auc_score(y_true_g, y_prob_g) if y_true_g.nunique() > 1 else np.nan
+        auc_g = roc_auc_score(
+            y_true_g, y_prob_g) if y_true_g.nunique() > 1 else np.nan
 
         results[group] = {
             "n": int(mask.sum()),
@@ -216,7 +241,8 @@ def compute_fairness_metrics(y_true_favorable, y_pred_favorable, y_prob_favorabl
         }
 
     # Identify advantaged/disadvantaged by approval rate
-    g_rates = {g: results[g]["approval_rate"] for g in groups if not pd.isna(results[g]["approval_rate"])}
+    g_rates = {g: results[g]["approval_rate"]
+               for g in groups if not pd.isna(results[g]["approval_rate"])}
     if not g_rates:
         advantaged_group, disadvantaged_group = None, None
         dir_val = np.nan
@@ -225,10 +251,14 @@ def compute_fairness_metrics(y_true_favorable, y_pred_favorable, y_prob_favorabl
         disadvantaged_group = min(g_rates, key=g_rates.get)
         dir_val = _compute_dir_ratio(y_pred_aligned, s_aligned)
 
-    approval_rates = np.array([results[g]["approval_rate"] for g in groups if not pd.isna(results[g]["approval_rate"])])
-    fnrs = np.array([results[g]["fnr"] for g in groups if not pd.isna(results[g]["fnr"])])
-    fprs = np.array([results[g]["fpr"] for g in groups if not pd.isna(results[g]["fpr"])])
-    ppvs = np.array([results[g]["ppv"] for g in groups if not pd.isna(results[g]["ppv"])])
+    approval_rates = np.array([results[g]["approval_rate"]
+                              for g in groups if not pd.isna(results[g]["approval_rate"])])
+    fnrs = np.array([results[g]["fnr"]
+                    for g in groups if not pd.isna(results[g]["fnr"])])
+    fprs = np.array([results[g]["fpr"]
+                    for g in groups if not pd.isna(results[g]["fpr"])])
+    ppvs = np.array([results[g]["ppv"]
+                    for g in groups if not pd.isna(results[g]["ppv"])])
 
     def max_min_gap(arr):
         return float(arr.max() - arr.min()) if arr.size > 0 else np.nan
@@ -238,11 +268,14 @@ def compute_fairness_metrics(y_true_favorable, y_pred_favorable, y_prob_favorabl
     fpr_parity_val = max_min_gap(fprs)
     ppv_parity_val = max_min_gap(ppvs)
 
-    dp_diff = float(demographic_parity_difference(y_true_aligned, y_pred_aligned, sensitive_features=s_aligned))
-    eo_diff = float(equalized_odds_difference(y_true_aligned, y_pred_aligned, sensitive_features=s_aligned))
+    dp_diff = float(demographic_parity_difference(
+        y_true_aligned, y_pred_aligned, sensitive_features=s_aligned))
+    eo_diff = float(equalized_odds_difference(
+        y_true_aligned, y_pred_aligned, sensitive_features=s_aligned))
 
     mf = MetricFrame(
-        metrics={"selection_rate": lambda yt, yp: np.mean(yp), "base_rate": lambda yt, yp: np.mean(yt)},
+        metrics={"selection_rate": lambda yt, yp: np.mean(
+            yp), "base_rate": lambda yt, yp: np.mean(yt)},
         y_true=y_true_aligned, y_pred=y_pred_aligned, sensitive_features=s_aligned
     )
 
@@ -257,7 +290,8 @@ def compute_fairness_metrics(y_true_favorable, y_pred_favorable, y_prob_favorabl
             f"PPV={stats['ppv'] if not np.isnan(stats['ppv']) else np.nan:.3f}"
         )
 
-    print(f"\n Disparate Impact Ratio: {dir_val:.3f} ({'PASS' if (not pd.isna(dir_val) and dir_val >= 0.80) else 'FAIL'} four-fifths rule)")
+    print(
+        f"\n Disparate Impact Ratio: {dir_val:.3f} ({'PASS' if (not pd.isna(dir_val) and dir_val >= 0.80) else 'FAIL'} four-fifths rule)")
     print(f" Statistical Parity Difference (gap): {spd_val:.4f}")
     print(f" Equal Opportunity Difference (FNR gap): {eod_val:.4f}")
     print(f" FPR Parity Difference (gap): {fpr_parity_val:.4f}")
@@ -291,7 +325,8 @@ def plot_approval_rates(metrics_by_group_dict, protected_attributes):
     Generates a bar plot of approval rates by protected attribute groups.
     Returns the matplotlib Figure object.
     """
-    fig, axes = plt.subplots(1, len(protected_attributes), figsize=(18, 6), sharey=True)
+    fig, axes = plt.subplots(1, len(protected_attributes),
+                             figsize=(18, 6), sharey=True)
     if len(protected_attributes) == 1:
         axes = [axes]
 
@@ -306,14 +341,17 @@ def plot_approval_rates(metrics_by_group_dict, protected_attributes):
         ax.set_ylabel('Approval Rate')
         ax.set_ylim(0, max(approval_rates) * 1.2 if approval_rates else 1)
 
-        advantaged_group = metrics_by_group_dict[attr_name].get('advantaged_group')
+        advantaged_group = metrics_by_group_dict[attr_name].get(
+            'advantaged_group')
         if advantaged_group and advantaged_group in details:
             advantaged_rate = details[advantaged_group]['approval_rate']
             if not pd.isna(advantaged_rate):
                 four_fifths_threshold = advantaged_rate * 0.80
-                ax.axhline(four_fifths_threshold, color='red', linestyle='--', label='4/5ths Rule Threshold')
+                ax.axhline(four_fifths_threshold, color='red',
+                           linestyle='--', label='4/5ths Rule Threshold')
                 ax.legend()
-        dir_val = metrics_by_group_dict[attr_name].get('disparate_impact_ratio')
+        dir_val = metrics_by_group_dict[attr_name].get(
+            'disparate_impact_ratio')
         if not pd.isna(dir_val):
             ax.text(0.5, 0.95, f"DIR: {dir_val:.3f}",
                     horizontalalignment='center', verticalalignment='top', transform=ax.transAxes,
@@ -342,7 +380,8 @@ def detect_proxy_variables(model, X_data_scaled, protected_col_series, feature_c
     proxy_scores = []
 
     # Unscale X_data_scaled for correlation calculation with the unscaled protected attribute
-    X_data_unscaled = pd.DataFrame(scaler_obj.inverse_transform(X_data_scaled), columns=feature_cols)
+    X_data_unscaled = pd.DataFrame(
+        scaler_obj.inverse_transform(X_data_scaled), columns=feature_cols)
 
     for feat in feature_cols:
         # Correlation with protected attribute (handle categorical vs numeric)
@@ -350,13 +389,17 @@ def detect_proxy_variables(model, X_data_scaled, protected_col_series, feature_c
             unique_vals = protected_col_series.dropna().unique()
             if len(unique_vals) == 2:
                 # Align series before correlation to handle missing values consistently
-                aligned_protected = protected_col_series.loc[X_data_unscaled.index].fillna(unique_vals[0]) # Fill NaN for correlation
-                encoded_protected = aligned_protected.map({unique_vals[0]: 0, unique_vals[1]: 1}).astype(int)
-                corr, p_val = pointbiserialr(encoded_protected, X_data_unscaled[feat])
-            else: # Multi-class categorical, simplified to 0 correlation for this specific function
+                aligned_protected = protected_col_series.loc[X_data_unscaled.index].fillna(
+                    unique_vals[0])  # Fill NaN for correlation
+                encoded_protected = aligned_protected.map(
+                    {unique_vals[0]: 0, unique_vals[1]: 1}).astype(int)
+                corr, p_val = pointbiserialr(
+                    encoded_protected, X_data_unscaled[feat])
+            else:  # Multi-class categorical, simplified to 0 correlation for this specific function
                 corr, p_val = 0, 1
-        else: # Numeric protected attribute
-            corr, p_val = pearsonr(protected_col_series.dropna(), X_data_unscaled[feat].loc[protected_col_series.dropna().index])
+        else:  # Numeric protected attribute
+            corr, p_val = pearsonr(protected_col_series.dropna(
+            ), X_data_unscaled[feat].loc[protected_col_series.dropna().index])
 
         proxy_scores.append({
             'feature': feat,
@@ -364,15 +407,18 @@ def detect_proxy_variables(model, X_data_scaled, protected_col_series, feature_c
             'p_value': p_val
         })
 
-    proxy_df = pd.DataFrame(proxy_scores).sort_values('correlation_with_protected', ascending=False)
+    proxy_df = pd.DataFrame(proxy_scores).sort_values(
+        'correlation_with_protected', ascending=False)
 
     # Get SHAP importance (uses scaled data)
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_data_scaled)
 
-    if isinstance(shap_values, list): # For multi-output (e.g. 0 and 1 class), take absolute mean over outputs and then samples
-        importance = np.mean([np.abs(s).mean(axis=0) for s in shap_values], axis=0)
-    else: # For single output, take absolute mean over samples
+    # For multi-output (e.g. 0 and 1 class), take absolute mean over outputs and then samples
+    if isinstance(shap_values, list):
+        importance = np.mean([np.abs(s).mean(axis=0)
+                             for s in shap_values], axis=0)
+    else:  # For single output, take absolute mean over samples
         importance = np.abs(shap_values).mean(axis=0)
 
     importance_dict = dict(zip(feature_cols, importance))
@@ -380,9 +426,11 @@ def detect_proxy_variables(model, X_data_scaled, protected_col_series, feature_c
     proxy_df['shap_importance'] = proxy_df['feature'].map(importance_dict)
 
     max_shap_importance = proxy_df['shap_importance'].max()
-    proxy_df['normalized_shap_importance'] = proxy_df['shap_importance'] / max_shap_importance if max_shap_importance > 0 else 0
+    proxy_df['normalized_shap_importance'] = proxy_df['shap_importance'] / \
+        max_shap_importance if max_shap_importance > 0 else 0
 
-    proxy_df['proxy_risk_score'] = proxy_df['correlation_with_protected'] * proxy_df['normalized_shap_importance']
+    proxy_df['proxy_risk_score'] = proxy_df['correlation_with_protected'] * \
+        proxy_df['normalized_shap_importance']
 
     median_shap = proxy_df['shap_importance'].median()
     proxy_df['is_proxy'] = (
@@ -390,11 +438,13 @@ def detect_proxy_variables(model, X_data_scaled, protected_col_series, feature_c
         (proxy_df['shap_importance'] > median_shap)
     )
 
-    print(f"\nPROXY VARIABLE DETECTION FOR {protected_col_series.name.upper()}:")
+    print(
+        f"\nPROXY VARIABLE DETECTION FOR {protected_col_series.name.upper()}:")
     print("=" * 70)
     print(f"{'Feature':<25s} {'Corr':>8s} {'SHAP':>8s} {'Risk':>8s} {'Proxy?':>8s}")
     print("-" * 70)
-    for index, row in proxy_df.head(10).iterrows(): # Display top 10 by correlation
+    # Display top 10 by correlation
+    for index, row in proxy_df.head(10).iterrows():
         flag = '>>> YES' if row['is_proxy'] else 'NO'
         print(f"{row['feature']:<25s} {row['correlation_with_protected']:>8.3f} {row['shap_importance']:>8.4f} {row['proxy_risk_score']:>8.4f} {flag:>8s}")
 
@@ -428,9 +478,12 @@ def plot_proxy_risk(proxy_results_dict, protected_attributes):
         ax.set_title(f'Proxy Risk for {attr_name}')
         ax.set_xlabel('Correlation with Protected Attribute (Absolute)')
         ax.set_ylabel('Model SHAP Importance (Mean Absolute)')
-        ax.axhline(df['shap_importance'].median(), color='gray', linestyle=':', label='Median SHAP Importance')
-        ax.axvline(0.15, color='orange', linestyle=':', label='Correlation Threshold (0.15)')
-        ax.legend(title='Is Proxy?', bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.axhline(df['shap_importance'].median(), color='gray',
+                   linestyle=':', label='Median SHAP Importance')
+        ax.axvline(0.15, color='orange', linestyle=':',
+                   label='Correlation Threshold (0.15)')
+        ax.legend(title='Is Proxy?', bbox_to_anchor=(
+            1.05, 1), loc='upper left')
         ax.grid(True, linestyle='--', alpha=0.6)
 
     plt.tight_layout()
@@ -474,23 +527,27 @@ def counterfactual_test(
                and flipped indicates if prediction changed (boolean array).
     """
     if not proxy_features:
-        print(f"Skipping counterfactual test for {protected_col_name}: no proxies provided.")
+        print(
+            f"Skipping counterfactual test for {protected_col_name}: no proxies provided.")
         return np.nan, np.nan
 
     X_test_unscaled_aligned = X_test_original.reset_index(drop=True)
     s_test = protected_col_series.reset_index(drop=True)
-    pred_original = pd.Series(y_pred_proba_original).reset_index(drop=True).to_numpy(dtype=float)
+    pred_original = pd.Series(y_pred_proba_original).reset_index(
+        drop=True).to_numpy(dtype=float)
 
     groups = pd.unique(s_test.dropna())
     if len(groups) != 2:
-        print(f"Skipping counterfactual test for {protected_col_name} (not binary). Groups: {list(groups)}")
+        print(
+            f"Skipping counterfactual test for {protected_col_name} (not binary). Groups: {list(groups)}")
         return np.nan, np.nan
 
     g1, g2 = groups[0], groups[1]
 
     proxy_features = [f for f in proxy_features if f in feature_cols]
     if not proxy_features:
-        print(f"Skipping counterfactual test for {protected_col_name}: no valid proxies in feature_cols.")
+        print(
+            f"Skipping counterfactual test for {protected_col_name}: no valid proxies in feature_cols.")
         return np.nan, np.nan
 
     X_test_scaled_df = pd.DataFrame(X_test_scaled, columns=feature_cols)
@@ -500,10 +557,12 @@ def counterfactual_test(
 
     # Filter for valid sensitive feature values in train set
     valid_train_mask = s_train.notna()
-    X_train_scaled_reset = X_train_scaled_reset[valid_train_mask].reset_index(drop=True)
+    X_train_scaled_reset = X_train_scaled_reset[valid_train_mask].reset_index(
+        drop=True)
     s_train = s_train[valid_train_mask].reset_index(drop=True)
 
-    group_means_scaled = X_train_scaled_reset.groupby(s_train)[proxy_features].mean()
+    group_means_scaled = X_train_scaled_reset.groupby(s_train)[
+        proxy_features].mean()
 
     if (g1 not in group_means_scaled.index) or (g2 not in group_means_scaled.index):
         print(
@@ -516,8 +575,10 @@ def counterfactual_test(
     cf_group = s_test.map(lambda v: g1 if v == g2 else g2)
 
     for f in proxy_features:
-        mu_orig = s_test.map(lambda v: group_means_scaled.loc[v, f]).to_numpy(dtype=float)
-        mu_cf = cf_group.map(lambda v: group_means_scaled.loc[v, f]).to_numpy(dtype=float)
+        mu_orig = s_test.map(
+            lambda v: group_means_scaled.loc[v, f]).to_numpy(dtype=float)
+        mu_cf = cf_group.map(
+            lambda v: group_means_scaled.loc[v, f]).to_numpy(dtype=float)
 
         if mode == "replace":
             X_cf[f] = mu_cf
@@ -529,17 +590,20 @@ def counterfactual_test(
     pred_counterfactual = model.predict_proba(X_cf)[:, 1].astype(float)
 
     delta = np.abs(pred_original - pred_counterfactual)
-    flipped = ((pred_original > threshold) != (pred_counterfactual > threshold))
+    flipped = ((pred_original > threshold) !=
+               (pred_counterfactual > threshold))
 
     print(f"\nCOUNTERFACTUAL FAIRNESS TEST for {protected_col_name.upper()}:")
     print("=" * 60)
-    print(f"Proxy features adjusted ({mode}): {', '.join(proxy_features[:10])}{'...' if len(proxy_features) > 10 else ''}")
+    print(
+        f"Proxy features adjusted ({mode}): {', '.join(proxy_features[:10])}{'...' if len(proxy_features) > 10 else ''}")
     print(f"Mean prediction change: {delta.mean():.4f}")
     print(f"Max prediction change: {delta.max():.4f}")
     print(f"Predictions flipped: {flipped.mean():.2%}")
 
     if flipped.mean() > 0.05:
-        print(f"\nFAIL: {flipped.mean():.2%} of predictions change when proxies are adjusted.")
+        print(
+            f"\nFAIL: {flipped.mean():.2%} of predictions change when proxies are adjusted.")
     else:
         print(f"\nPASS: <5% of predictions affected by counterfactual adjustment.")
 
@@ -566,7 +630,8 @@ def plot_counterfactual_deltas(counterfactual_deltas_dict, protected_attributes)
             ax.set_ylabel('Frequency')
         else:
             ax.set_title(f'Counterfactual Test Not Applicable for {attr_name}')
-            ax.text(0.5, 0.5, 'Test Skipped', ha='center', va='center', transform=ax.transAxes)
+            ax.text(0.5, 0.5, 'Test Skipped', ha='center',
+                    va='center', transform=ax.transAxes)
 
     plt.tight_layout()
     return fig
@@ -581,10 +646,14 @@ def accuracy_fairness_tradeoff(
     sensitive_test,
     *,
     threshold: float = 0.5,
-    xgb_params=None
+    xgb_params=None,
+    use_cache: bool = True,
+    cache_dir: str = ".fairness_cache"
 ):
     """
     Compares an unconstrained XGBoost model against a DemographicParity-constrained model.
+    Results are cached to avoid expensive retraining when inputs haven't changed.
+
     Args:
         X_train_scaled: Scaled training features.
         y_train_favorable: Favorable outcomes for training (1=favorable).
@@ -594,16 +663,17 @@ def accuracy_fairness_tradeoff(
         sensitive_test: Sensitive features for the test set.
         threshold: Prediction threshold.
         xgb_params: Parameters for XGBoostClassifier.
+        use_cache: If True, uses cached results if available.
+        cache_dir: Directory to store cache files.
     Returns:
         dict: A dictionary containing performance and fairness metrics for both models.
     """
-    print("\nMEASURING ACCURACY-FAIRNESS TRADE-OFF:")
-    print("=" * 60)
-
     X_train_scaled = pd.DataFrame(X_train_scaled).reset_index(drop=True)
     X_test_scaled = pd.DataFrame(X_test_scaled).reset_index(drop=True)
-    y_train_favorable = pd.Series(y_train_favorable).reset_index(drop=True).astype(int)
-    y_test_favorable = pd.Series(y_test_favorable).reset_index(drop=True).astype(int)
+    y_train_favorable = pd.Series(
+        y_train_favorable).reset_index(drop=True).astype(int)
+    y_test_favorable = pd.Series(
+        y_test_favorable).reset_index(drop=True).astype(int)
 
     s_train = pd.Series(sensitive_train).reset_index(drop=True)
     s_test = pd.Series(sensitive_test).reset_index(drop=True)
@@ -614,6 +684,49 @@ def accuracy_fairness_tradeoff(
             eval_metric="logloss",
             random_state=42
         )
+
+    # Create cache key from input data and parameters
+    if use_cache:
+        os.makedirs(cache_dir, exist_ok=True)
+
+        # Create a hash of the inputs
+        cache_components = [
+            X_train_scaled.values.tobytes(),
+            X_test_scaled.values.tobytes(),
+            y_train_favorable.values.tobytes(),
+            y_test_favorable.values.tobytes(),
+            s_train.values.tobytes(),
+            s_test.values.tobytes(),
+            str(threshold).encode(),
+            str(sorted(xgb_params.items())).encode()
+        ]
+        cache_hash = hashlib.md5(b''.join(cache_components)).hexdigest()
+        cache_file = os.path.join(cache_dir, f"tradeoff.pkl")
+
+        # Check if cache exists
+        if os.path.exists(cache_file):
+            print("\nLOADING CACHED ACCURACY-FAIRNESS TRADE-OFF RESULTS:")
+            print("=" * 60)
+            with open(cache_file, 'rb') as f:
+                cached_results = pickle.load(f)
+            print("Cache loaded successfully!")
+            print(f"{'Metric':<30s} {'Unconstrained':>15s} {'Fair Model':>15s}")
+            print("-" * 60)
+            print(
+                f"{'ROC AUC':<30s} {cached_results['base_auc']:>15.4f} {'(n/a)':>15s}")
+            print(
+                f"{'Accuracy':<30s} {cached_results['base_acc']:>15.4f} {cached_results['fair_acc']:>15.4f}")
+            print(
+                f"{'Disparate Impact Ratio':<30s} {cached_results['base_dir']:>15.3f} {cached_results['fair_dir']:>15.3f}")
+            print(f"{'Four-Fifths Rule':<30s} "
+                  f"{'PASS' if (not pd.isna(cached_results['base_dir']) and cached_results['base_dir'] >= 0.80) else 'FAIL':>15s} "
+                  f"{'PASS' if (not pd.isna(cached_results['fair_dir']) and cached_results['fair_dir'] >= 0.80) else 'FAIL':>15s}")
+            print(
+                f"{'Accuracy Cost of Fairness':<30s} {'---':>15s} {cached_results['acc_cost_of_fairness']:>+15.4f}")
+            return cached_results
+
+    print("\nMEASURING ACCURACY-FAIRNESS TRADE-OFF:")
+    print("=" * 60)
 
     # 1) Unconstrained model
     base_model = XGBClassifier(**xgb_params)
@@ -631,7 +744,8 @@ def accuracy_fairness_tradeoff(
         estimator=XGBClassifier(**xgb_params),
         constraints=DemographicParity()
     )
-    fair_model.fit(X_train_scaled, y_train_favorable, sensitive_features=s_train)
+    fair_model.fit(X_train_scaled, y_train_favorable,
+                   sensitive_features=s_train)
 
     fair_pred = fair_model.predict(X_test_scaled).astype(int)
     fair_dir = _compute_dir_ratio(fair_pred, s_test)
@@ -647,7 +761,7 @@ def accuracy_fairness_tradeoff(
           f"{'PASS' if (not pd.isna(fair_dir) and fair_dir >= 0.80) else 'FAIL':>15s}")
     print(f"{'Accuracy Cost of Fairness':<30s} {'---':>15s} {(base_acc - fair_acc):>+15.4f}")
 
-    return {
+    results = {
         "base_auc": float(base_auc),
         "base_acc": float(base_acc),
         "fair_acc": float(fair_acc),
@@ -655,6 +769,14 @@ def accuracy_fairness_tradeoff(
         "fair_dir": float(fair_dir) if not np.isnan(fair_dir) else np.nan,
         "acc_cost_of_fairness": float(base_acc - fair_acc),
     }
+
+    # Save to cache
+    if use_cache:
+        with open(cache_file, 'wb') as f:
+            pickle.dump(results, f)
+        print(f"\nResults cached to: {cache_file}")
+
+    return results
 
 
 def plot_accuracy_fairness_tradeoff(tradeoff_results_dict):
@@ -664,9 +786,11 @@ def plot_accuracy_fairness_tradeoff(tradeoff_results_dict):
     """
     fig = plt.figure(figsize=(8, 6))
     if tradeoff_results_dict.get("base_dir") is not None and tradeoff_results_dict.get("base_auc") is not None:
-        plt.scatter(tradeoff_results_dict["base_dir"], tradeoff_results_dict["base_auc"], s=200, label="Unconstrained (AUC)", marker="o")
+        plt.scatter(tradeoff_results_dict["base_dir"], tradeoff_results_dict["base_auc"],
+                    s=200, label="Unconstrained (AUC)", marker="o")
     if tradeoff_results_dict.get("fair_dir") is not None and tradeoff_results_dict.get("fair_acc") is not None:
-        plt.scatter(tradeoff_results_dict["fair_dir"], tradeoff_results_dict["fair_acc"], s=200, label="Fair Model (Accuracy)", marker="s")
+        plt.scatter(tradeoff_results_dict["fair_dir"], tradeoff_results_dict["fair_acc"],
+                    s=200, label="Fair Model (Accuracy)", marker="s")
 
     plt.axvline(0.80, linestyle=":", label="4/5ths Rule (DIR=0.80)")
     plt.title("Accuracy–Fairness Trade-off")
@@ -707,7 +831,8 @@ def compile_fairness_report(metrics_by_group, proxy_results_by_group, counterfac
     print("\n--- FAIRNESS METRICS ASSESSMENT ---")
     for attr, metrics in metrics_by_group.items():
         dir_val = metrics.get("disparate_impact_ratio", np.nan)
-        four_fifths_pass = bool(metrics.get("four_fifths_pass", False)) if not pd.isna(dir_val) else False
+        four_fifths_pass = bool(metrics.get(
+            "four_fifths_pass", False)) if not pd.isna(dir_val) else False
 
         report["summary_metrics"][attr] = {
             "disparate_impact_ratio": dir_val,
@@ -749,7 +874,8 @@ def compile_fairness_report(metrics_by_group, proxy_results_by_group, counterfac
 
         n_proxies = int(df["is_proxy"].sum())
         if n_proxies > 0:
-            proxy_names = df.loc[df["is_proxy"], "feature"].astype(str).tolist()
+            proxy_names = df.loc[df["is_proxy"],
+                                 "feature"].astype(str).tolist()
             all_proxies_found.extend(proxy_names)
             report["findings"].append({
                 "attribute": f"Proxy Variables ({key})",
@@ -796,23 +922,33 @@ def compile_fairness_report(metrics_by_group, proxy_results_by_group, counterfac
     # ---------- 4) Overall assessment ----------
     if critical_failures == 0:
         report["overall_assessment"] = "PASS"
-        report["required_actions"].append("Continue monitoring model fairness and performance.")
+        report["required_actions"].append(
+            "Continue monitoring model fairness and performance.")
         if all_proxies_found:
             report["overall_assessment"] = "CONDITIONAL"
-            report["required_actions"].append("Review and document business justification for proxy variables.")
-            report["required_actions"].append("Conduct adverse action analysis for declined applicants.")
+            report["required_actions"].append(
+                "Review and document business justification for proxy variables.")
+            report["required_actions"].append(
+                "Conduct adverse action analysis for declined applicants.")
     elif critical_failures <= 1:
         report["overall_assessment"] = "CONDITIONAL"
-        report["required_actions"].append("Implement fairness constraints for the flagged attribute.")
-        report["required_actions"].append("Review and document business justification for proxy variables.")
-        report["required_actions"].append("Conduct adverse action analysis for declined applicants.")
-        report["required_actions"].append("Retest after mitigation within 90 days.")
+        report["required_actions"].append(
+            "Implement fairness constraints for the flagged attribute.")
+        report["required_actions"].append(
+            "Review and document business justification for proxy variables.")
+        report["required_actions"].append(
+            "Conduct adverse action analysis for declined applicants.")
+        report["required_actions"].append(
+            "Retest after mitigation within 90 days.")
     else:
         report["overall_assessment"] = "FAIL"
-        report["required_actions"].append("Suspend model for the affected use case.")
+        report["required_actions"].append(
+            "Suspend model for the affected use case.")
         report["required_actions"].append("Retrain with fairness constraints.")
-        report["required_actions"].append("Full revalidation required before redeployment.")
-        report["required_actions"].append("Conduct adverse action analysis for all declined applicants.")
+        report["required_actions"].append(
+            "Full revalidation required before redeployment.")
+        report["required_actions"].append(
+            "Conduct adverse action analysis for all declined applicants.")
 
     # ---------- 5) Trade-off results ----------
     print("\n--- ACCURACY-FAIRNESS TRADE-OFF ---")
@@ -882,19 +1018,23 @@ def run_fairness_audit(n_samples=10000, test_size=0.3, random_state=42):
     # 1. Load and Prepare Data, Train Initial Model
     (X_test_scaled, y_test_true, y_pred, y_pred_proba, y_pred_favorable, y_true_favorable,
      model, feature_cols, X_train_scaled, y_train_true, scaler, X_test_original) = \
-        load_and_prepare_credit_data(n_samples=n_samples, test_size=test_size, random_state=random_state)
+        load_and_prepare_credit_data(
+            n_samples=n_samples, test_size=test_size, random_state=random_state)
 
     # 2. Augment with Demographics (for both test and train sets)
     print("\nAugmenting test data with synthetic demographics...")
-    X_test_fair = augment_with_demographics(X_test_original.copy(), seed=random_state)
+    X_test_fair = augment_with_demographics(
+        X_test_original.copy(), seed=random_state)
     print("\nAugmenting train data with synthetic demographics (for counterfactual and trade-off tests)...")
     # Need X_train_original to augment, then combine with X_train_scaled for model training (if needed again)
-    X_train_original = pd.DataFrame(scaler.inverse_transform(X_train_scaled), columns=feature_cols)
-    X_train_fair = augment_with_demographics(X_train_original.copy(), seed=random_state)
-
+    X_train_original = pd.DataFrame(
+        scaler.inverse_transform(X_train_scaled), columns=feature_cols)
+    X_train_fair = augment_with_demographics(
+        X_train_original.copy(), seed=random_state)
 
     # Define protected attributes for the audit
-    protected_attributes = [('Gender', 'gender'), ('Race', 'race_group'), ('Age', 'age_group')]
+    protected_attributes = [('Gender', 'gender'),
+                            ('Race', 'race_group'), ('Age', 'age_group')]
 
     # Dictionaries to store results from various audit steps
     metrics_by_group = {}
@@ -911,7 +1051,8 @@ def run_fairness_audit(n_samples=10000, test_size=0.3, random_state=42):
 
     # 4. Plot Approval Rates
     print("\nPlotting approval rates...")
-    fig_approval_rates = plot_approval_rates(metrics_by_group, protected_attributes)
+    fig_approval_rates = plot_approval_rates(
+        metrics_by_group, protected_attributes)
 
     # 5. Detect Proxy Variables for each protected attribute
     for attr_name, col_name in protected_attributes:
@@ -922,12 +1063,15 @@ def run_fairness_audit(n_samples=10000, test_size=0.3, random_state=42):
 
     # 6. Plot Proxy Risk
     print("\nPlotting proxy risk...")
-    fig_proxy_risk = plot_proxy_risk(proxy_results_by_group, protected_attributes)
+    fig_proxy_risk = plot_proxy_risk(
+        proxy_results_by_group, protected_attributes)
 
     # 7. Perform Counterfactual Testing
     for attr_name, col_name in protected_attributes:
-        current_proxy_df = proxy_results_by_group.get(attr_name, pd.DataFrame())
-        top_proxies = current_proxy_df[current_proxy_df["is_proxy"]]["feature"].tolist() if 'is_proxy' in current_proxy_df.columns else []
+        current_proxy_df = proxy_results_by_group.get(
+            attr_name, pd.DataFrame())
+        top_proxies = current_proxy_df[current_proxy_df["is_proxy"]]["feature"].tolist(
+        ) if 'is_proxy' in current_proxy_df.columns else []
 
         delta, flipped = counterfactual_test(
             model=model,
@@ -946,14 +1090,17 @@ def run_fairness_audit(n_samples=10000, test_size=0.3, random_state=42):
         )
 
         if isinstance(delta, np.ndarray):
-            counterfactual_results[attr_name] = {"delta_mean": float(delta.mean()), "flipped_rate": float(flipped.mean())}
+            counterfactual_results[attr_name] = {"delta_mean": float(
+                delta.mean()), "flipped_rate": float(flipped.mean())}
             counterfactual_deltas[attr_name] = delta
         else:
-            counterfactual_results[attr_name] = {"delta_mean": np.nan, "flipped_rate": np.nan}
+            counterfactual_results[attr_name] = {
+                "delta_mean": np.nan, "flipped_rate": np.nan}
 
     # 8. Plot Counterfactual Deltas
     print("\nPlotting counterfactual deltas...")
-    fig_counterfactual_deltas = plot_counterfactual_deltas(counterfactual_deltas, protected_attributes)
+    fig_counterfactual_deltas = plot_counterfactual_deltas(
+        counterfactual_deltas, protected_attributes)
 
     # 9. Perform Accuracy-Fairness Trade-off Analysis
     # Ensure y_train_favorable and y_test_favorable are defined as 1=approved
@@ -974,7 +1121,8 @@ def run_fairness_audit(n_samples=10000, test_size=0.3, random_state=42):
     fig_tradeoff = plot_accuracy_fairness_tradeoff(tradeoff_results)
 
     # 11. Compile Final Audit Report
-    final_audit_report = compile_fairness_report(metrics_by_group, proxy_results_by_group, counterfactual_results, tradeoff_results)
+    final_audit_report = compile_fairness_report(
+        metrics_by_group, proxy_results_by_group, counterfactual_results, tradeoff_results)
 
     print("\nFairness audit completed.")
 
